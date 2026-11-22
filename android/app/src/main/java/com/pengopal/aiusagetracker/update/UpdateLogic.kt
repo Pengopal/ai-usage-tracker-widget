@@ -17,6 +17,8 @@ sealed interface UpdateState {
     data class Available(val release: Release) : UpdateState
     data class Downloading(val release: Release, val progress: Float) : UpdateState
     data class Installing(val release: Release) : UpdateState
+    /** Android's install dialog is waiting; the app shows it when it is in front. */
+    data class NeedsConfirm(val release: Release) : UpdateState
     data class Failed(val message: String) : UpdateState
 }
 
@@ -47,4 +49,11 @@ fun isNewer(remote: String, local: String): Boolean {
         if (a != b) return a > b
     }
     return false
+}
+
+/** The state after Android's package installer reports [status] for [release]. */
+fun installResultState(status: Int, message: String?, release: Release): UpdateState = when (status) {
+    android.content.pm.PackageInstaller.STATUS_PENDING_USER_ACTION -> UpdateState.NeedsConfirm(release)
+    android.content.pm.PackageInstaller.STATUS_SUCCESS -> UpdateState.Idle
+    else -> UpdateState.Failed(message ?: "Install cancelled")
 }

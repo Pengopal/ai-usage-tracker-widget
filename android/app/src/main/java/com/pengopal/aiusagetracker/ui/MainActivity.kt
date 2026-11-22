@@ -303,6 +303,8 @@ private fun AboutSection() {
     val scope = rememberCoroutineScope()
     val update by Updates.state.collectAsStateWithLifecycle()
     LaunchedEffect(Unit) { if (Updates.supported) Updates.check() }
+    // This only runs while the screen is showing, which is when Android allows the install dialog.
+    LaunchedEffect(update) { if (update is UpdateState.NeedsConfirm) Updates.confirm(context) }
 
     Row(verticalAlignment = Alignment.CenterVertically) {
         Column(Modifier.weight(1f)) {
@@ -316,6 +318,7 @@ private fun AboutSection() {
                     is UpdateState.Available -> "Version ${u.release.version} is available"
                     is UpdateState.Downloading -> "Downloading ${(u.progress * 100).toInt()}%"
                     is UpdateState.Installing -> "Installing…"
+                    is UpdateState.NeedsConfirm -> "Tap Install to finish updating"
                     is UpdateState.Failed -> u.message
                 },
                 color = if (update is UpdateState.Available) Palette.accent else Palette.muted,
@@ -323,7 +326,8 @@ private fun AboutSection() {
             )
         }
         when (update) {
-            is UpdateState.Available -> Button(onClick = { scope.launch { Updates.install(context) } }) { Text("Update", fontSize = 13.sp) }
+            is UpdateState.Available -> Button(onClick = { Updates.start(context) }) { Text("Update", fontSize = 13.sp) }
+            is UpdateState.NeedsConfirm -> Button(onClick = { Updates.confirm(context) }) { Text("Install", fontSize = 13.sp) }
             UpdateState.Unsupported -> {}
             else -> OutlinedButton(
                 onClick = { scope.launch { Updates.check() } },

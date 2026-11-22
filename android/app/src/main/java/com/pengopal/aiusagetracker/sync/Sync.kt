@@ -38,10 +38,11 @@ object Sync {
         try {
             val store = UsageStore.get(app)
             val settings = store.state.value.settings
-            val ids = orderedIds(settings.order, Catalog.load(app)).filter { settings.provider(it).enabled }
+            val catalog = Catalog.load(app)
+            val ids = orderedIds(settings.order, catalog).filter { settings.provider(it).enabled }
             val runner = CoreRunner(app)
             val results = coroutineScope {
-                ids.map { id -> async { id to runCatching { runner.read(id) } } }.awaitAll()
+                ids.map { id -> async { id to readResult(catalog[id]?.host ?: id) { runner.read(id) } } }.awaitAll()
             }
             val now = System.currentTimeMillis()
             store.update { s ->
@@ -70,7 +71,8 @@ object Sync {
     fun runNow(context: Context) {
         WorkManager.getInstance(context).enqueueUniqueWork(
             "sync-now",
-            ExistingWorkPolicy.KEEP,
+            // Queue behind a sync already running, so a sign-in that lands mid-sync still gets read.
+            ExistingWorkPolicy.APPEND_OR_REPLACE,
             OneTimeWorkRequestBuilder<SyncWorker>().setConstraints(network).build(),
         )
     }

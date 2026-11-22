@@ -1,5 +1,9 @@
 package com.pengopal.aiusagetracker
 
+import android.content.pm.PackageInstaller
+import com.pengopal.aiusagetracker.update.Release
+import com.pengopal.aiusagetracker.update.UpdateState
+import com.pengopal.aiusagetracker.update.installResultState
 import com.pengopal.aiusagetracker.update.isNewer
 import com.pengopal.aiusagetracker.update.parseRelease
 import org.junit.Assert.assertEquals
@@ -35,5 +39,15 @@ class UpdateCheckTest {
     fun noApkAsset() {
         val r = parseRelease("""{"tag_name":"v1.4.0","html_url":"https://h","assets":[{"name":"latest.yml","browser_download_url":"u","size":1}]}""")
         assertNull(r.apkUrl)
+    }
+
+    @Test
+    fun installResult() {
+        val rel = Release("1.4.0", "https://e/apk", 42, "https://e/page")
+        // A confirm dialog Android may block from the background stays one tap away instead of hanging on "Installing…".
+        assertEquals(UpdateState.NeedsConfirm(rel), installResultState(PackageInstaller.STATUS_PENDING_USER_ACTION, null, rel))
+        assertEquals(UpdateState.Idle, installResultState(PackageInstaller.STATUS_SUCCESS, null, rel))
+        assertEquals(UpdateState.Failed("Install cancelled"), installResultState(PackageInstaller.STATUS_FAILURE_ABORTED, null, rel))
+        assertEquals(UpdateState.Failed("Conflict"), installResultState(PackageInstaller.STATUS_FAILURE_CONFLICT, "Conflict", rel))
     }
 }

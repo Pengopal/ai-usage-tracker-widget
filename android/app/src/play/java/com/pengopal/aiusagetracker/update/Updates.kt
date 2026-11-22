@@ -12,5 +12,7 @@ object Updates {
 
     suspend fun check() = Unit
 
-    suspend fun install(context: Context) = Unit
+    fun start(context: Context) = Unit
+
+    fun confirm(context: Context) = Unit
 }

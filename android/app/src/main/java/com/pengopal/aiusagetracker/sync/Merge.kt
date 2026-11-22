@@ -21,3 +21,18 @@ fun merge(prev: ServiceState, result: Result<JSONObject>, now: Long): ServiceSta
         lastSync = now,
     )
 }
+
+/**
+ * Runs one provider read. A timeout becomes a plain message the widget can
+ * show; any other cancellation (WorkManager stopping the worker) is rethrown
+ * so it is never stored as a "Sync problem".
+ */
+suspend fun <T> readResult(host: String, block: suspend () -> T): Result<T> = try {
+    Result.success(block())
+} catch (e: kotlinx.coroutines.TimeoutCancellationException) {
+    Result.failure(Exception("Timed out loading $host"))
+} catch (e: kotlinx.coroutines.CancellationException) {
+    throw e
+} catch (e: Exception) {
+    Result.failure(e)
+}
