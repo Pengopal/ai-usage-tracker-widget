@@ -75,9 +75,10 @@ jobs:
         working-directory: .
         run: |
           version="${GITHUB_REF_NAME#v}"
+          # Plain string matching (no regex), so the brackets need no escaping.
           awk -v v="$version" '
-            $0 ~ "^## \[" v "\]" { on = 1; next }
-            on && /^## \[/ { exit }
+            index($0, "## [" v "]") == 1 { on = 1; next }
+            on && index($0, "## [") == 1 { exit }
             on { print }
           ' CHANGELOG.md > notes.md
           test -s notes.md || { echo "::error::CHANGELOG.md has no section for $version"; exit 1; }
