@@ -77,10 +77,16 @@ function effectivePlan(id, service, chosen) {
   };
 }
 
-// Rows for the widget: enabled providers, each with the metrics its plan shows
-// and the account actually reports.
-function buildRows(services, providerSettings, insights = {}) {
-  return PROVIDER_IDS
+// The user's provider order: known ids once each, any missing ones appended.
+function orderedIds(order) {
+  const picked = (Array.isArray(order) ? order : []).filter((id, i, all) => CATALOG[id] && all.indexOf(id) === i);
+  return [...picked, ...PROVIDER_IDS.filter((id) => !picked.includes(id))];
+}
+
+// Rows for the widget, in the user's order: enabled providers, each with the
+// metrics its plan shows and the account actually reports.
+function buildRows(services, providerSettings, insights = {}, order) {
+  return orderedIds(order)
     .filter((id) => providerSettings[id]?.enabled !== false)
     .map((id) => {
       const def = CATALOG[id];
@@ -96,7 +102,6 @@ function buildRows(services, providerSettings, insights = {}) {
             pct: s.windows[m].pct,
             reset: s.windows[m].reset,
             pace: insights.pace?.[metricId] ?? null,
-            spark: insights.spark?.[metricId] || [],
             detail: m === 'weekly' && s.detail ? s.detail : null,
           };
         });
@@ -113,4 +118,4 @@ function buildRows(services, providerSettings, insights = {}) {
     });
 }
 
-module.exports = { CATALOG, PROVIDER_IDS, emptyService, defaultProviderSettings, planOptions, effectivePlan, buildRows };
+module.exports = { CATALOG, PROVIDER_IDS, emptyService, defaultProviderSettings, planOptions, effectivePlan, orderedIds, buildRows };

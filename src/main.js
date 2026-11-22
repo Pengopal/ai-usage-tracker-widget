@@ -6,7 +6,7 @@ const { Store, cleanThresholds } = require('./store');
 const { services } = require('./sync');
 const updater = require('./updater');
 const { computeInsights, sampleOf } = require('./insights');
-const { CATALOG, PROVIDER_IDS, emptyService, planOptions, buildRows } = require('./providers');
+const { CATALOG, emptyService, planOptions, orderedIds, buildRows } = require('./providers');
 
 const DEFAULT_WIDTH = { bars: 320, rings: 264 };
 const DEFAULT_HEIGHT = 200;
@@ -50,7 +50,8 @@ function makeIcon(size) {
 
 const view = () => store.data.settings.view;
 const savedWidth = (v = view()) => store.data.bounds?.widths?.[v] || DEFAULT_WIDTH[v];
-const enabledIds = () => PROVIDER_IDS.filter((id) => store.data.settings.providers[id]?.enabled !== false);
+const order = () => orderedIds(store.data.settings.order);
+const enabledIds = () => order().filter((id) => store.data.settings.providers[id]?.enabled !== false);
 
 function initialBounds() {
   const saved = store.data.bounds;
@@ -187,8 +188,8 @@ function snapshot() {
   return {
     settings,
     syncing,
-    rows: buildRows(data, settings.providers, insights),
-    providers: PROVIDER_IDS.map((id) => ({
+    rows: buildRows(data, settings.providers, insights, settings.order),
+    providers: order().map((id) => ({
       id,
       name: CATALOG[id].name,
       logo: CATALOG[id].logo,
@@ -266,7 +267,7 @@ function checkAlerts() {
   const notified = {};
   const lastPct = { ...d.lastPct };
 
-  for (const row of buildRows(d.services, s.providers, insights)) {
+  for (const row of buildRows(d.services, s.providers, insights, s.order)) {
     for (const m of row.metrics) {
       const label = `${row.name} ${m.label.toLowerCase()} limit`;
       const key = windowKey(m.id, m.reset);
@@ -329,6 +330,12 @@ function registerIpc() {
     const providers = { ...store.data.settings.providers, [id]: { ...store.data.settings.providers[id], ...patch } };
     saveSettings({ providers });
     if (!wasEnabled && providers[id].enabled) syncAll();
+    return snapshot();
+  });
+
+  // New provider order from drag-and-drop in settings.
+  ipcMain.handle('save-order', (_e, ids) => {
+    saveSettings({ order: orderedIds(ids) });
     return snapshot();
   });
 

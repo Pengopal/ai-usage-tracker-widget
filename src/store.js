@@ -1,7 +1,7 @@
 // Tiny JSON-file store kept in Electron's userData folder.
 const fs = require('fs');
 const path = require('path');
-const { PROVIDER_IDS, emptyService, defaultProviderSettings } = require('./providers');
+const { PROVIDER_IDS, emptyService, defaultProviderSettings, orderedIds } = require('./providers');
 const { migrateSample } = require('./insights');
 
 const HISTORY_KEEP_MS = 7 * 24 * 3600 * 1000;
@@ -58,6 +58,7 @@ function normalize(raw) {
     if (p) providers[id] = { enabled: p.enabled !== false, plan: typeof p.plan === 'string' ? p.plan : 'auto' };
   }
   settings.providers = providers;
+  settings.order = orderedIds(settings.order);
 
   const services = {};
   for (const id of PROVIDER_IDS) {

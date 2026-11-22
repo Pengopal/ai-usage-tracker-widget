@@ -1,9 +1,8 @@
-// Derived views over the stored reading history: burn-rate pace and sparklines.
+// Burn-rate pace from the stored reading history, for the heads-up notification.
 // History samples look like { t, v: { 'claude.session': 14, 'grok.weekly': 43, … } }.
 const MINUTE = 60 * 1000;
 const PACE_LOOKBACK = 90 * MINUTE;
 const PACE_MIN_SPAN = 10 * MINUTE;
-const SPARK_SPAN = 24 * 60 * MINUTE;
 
 // Every metric with a reading: { 'claude.session': { pct, reset }, … }.
 function currentReadings(services) {
@@ -45,12 +44,9 @@ function pace(history, key, current, now) {
 }
 
 function computeInsights(services, history, now = Date.now()) {
-  const out = { pace: {}, spark: {} };
+  const out = { pace: {} };
   for (const [key, current] of Object.entries(currentReadings(services))) {
     out.pace[key] = pace(history, key, current, now);
-    out.spark[key] = history
-      .filter((s) => valueOf(s, key) != null && now - s.t <= SPARK_SPAN)
-      .map((s) => [s.t, valueOf(s, key)]);
   }
   return out;
 }

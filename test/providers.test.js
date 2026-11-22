@@ -1,6 +1,6 @@
 const test = require('node:test');
 const assert = require('node:assert/strict');
-const { buildRows, defaultProviderSettings, planOptions } = require('../src/providers');
+const { buildRows, defaultProviderSettings, planOptions, orderedIds } = require('../src/providers');
 
 const services = {
   claude: { connected: true, plan: 'max20', windows: { session: { pct: 10, reset: null }, weekly: { pct: 40, reset: null } } },
@@ -30,6 +30,16 @@ test('a signed-out provider still gets a row so it can be signed in', () => {
   const openai = buildRows(services, defaultProviderSettings()).find((r) => r.id === 'openai');
   assert.equal(openai.connected, false);
   assert.deepEqual(openai.metrics, []);
+});
+
+test('rows follow the chosen provider order', () => {
+  const rows = buildRows(services, defaultProviderSettings(), {}, ['grok', 'claude', 'openai']);
+  assert.deepEqual(rows.map((r) => r.id), ['grok', 'claude', 'openai']);
+});
+
+test('an order missing providers or naming unknown ones still lists each provider once', () => {
+  assert.deepEqual(orderedIds(['grok', 'gemini', 'grok']), ['grok', 'claude', 'openai']);
+  assert.deepEqual(orderedIds(undefined), ['claude', 'openai', 'grok']);
 });
 
 test('the plan picker offers Auto first and no internal-only plans', () => {
