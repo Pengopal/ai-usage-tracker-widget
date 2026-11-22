@@ -5,8 +5,8 @@ const path = require('path');
 const { Store, cleanThresholds } = require('./store');
 const { services } = require('./sync');
 const updater = require('./updater');
-const { computeInsights, sampleOf } = require('./insights');
-const { CATALOG, emptyService, planOptions, orderedIds, buildRows } = require('./providers');
+const { computeInsights, sampleOf } = require('./core/insights');
+const { CATALOG, emptyService, planOptions, orderedIds, buildRows } = require('./core/providers');
 
 const DEFAULT_WIDTH = { bars: 320, rings: 264 };
 const DEFAULT_HEIGHT = 200;

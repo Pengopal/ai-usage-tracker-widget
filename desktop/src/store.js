@@ -1,8 +1,8 @@
 // Tiny JSON-file store kept in Electron's userData folder.
 const fs = require('fs');
 const path = require('path');
-const { PROVIDER_IDS, emptyService, defaultProviderSettings, orderedIds } = require('./providers');
-const { migrateSample } = require('./insights');
+const { PROVIDER_IDS, emptyService, defaultProviderSettings, orderedIds } = require('./core/providers');
+const { migrateSample } = require('./core/insights');
 
 const HISTORY_KEEP_MS = 7 * 24 * 3600 * 1000;
 const HISTORY_MIN_GAP_MS = 5 * 60 * 1000;
