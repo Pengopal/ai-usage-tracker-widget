@@ -6,19 +6,18 @@ All notable changes to this project are listed here. The format follows
 
 ## [Unreleased]
 
+## [1.3.1] - 2026-11-23
+
 ### Android
 
+- **Fixed:** refreshing from the widget no longer times out. Each provider's reader starts as soon as its page is
+  on the provider's site instead of waiting for the whole web app to load, which in the background could take
+  longer than the 45-second limit.
+- **Fixed:** "Continue with Google" sign-in no longer ends on a white screen. Sign-in popups now open as a window
+  over the page, so they can hand the sign-in back to it.
 - Builds with Android Gradle Plugin 9.5 (built-in Kotlin) and Gradle 9.9, and compiles against Android API 37.1.
   The app still targets API 36, so its behaviour is unchanged.
 - Updated Compose (BOM 2026.11.01), WorkManager 2.12 and Kotlin 2.4.
-
-### Fixed
-
-- **Android:** refreshing from the widget no longer times out. Each provider's reader starts as soon as its page
-  is on the provider's site instead of waiting for the whole web app to load, which in the background could take
-  longer than the 45-second limit.
-- **Android:** "Continue with Google" sign-in no longer ends on a white screen. Sign-in popups now open as a
-  window over the page, so they can hand the sign-in back to it.
 
 ### Desktop
 
@@ -104,7 +103,8 @@ All notable changes to this project are listed here. The format follows
   minute after a one-time sign-in.
 - Colour-coded bars, reset countdowns, threshold notifications, tray icon.
 
-[Unreleased]: https://github.com/Pengopal/ai-usage-tracker-widget/compare/v1.3.0...HEAD
+[Unreleased]: https://github.com/Pengopal/ai-usage-tracker-widget/compare/v1.3.1...HEAD
+[1.3.1]: https://github.com/Pengopal/ai-usage-tracker-widget/compare/v1.3.0...v1.3.1
 [1.3.0]: https://github.com/Pengopal/ai-usage-tracker-widget/compare/v1.2.1...v1.3.0
 [1.2.1]: https://github.com/Pengopal/ai-usage-tracker-widget/compare/v1.2.0...v1.2.1
 [1.2.0]: https://github.com/Pengopal/ai-usage-tracker-widget/compare/v1.1.0...v1.2.0
