@@ -6,6 +6,26 @@ All notable changes to this project are listed here. The format follows
 
 ## [Unreleased]
 
+## [1.3.0] - 2026-11-22
+
+### Android
+
+- **New: Android home-screen widget.** Your Claude, ChatGPT and Grok limits on the home screen, in the same bar
+  layout as the desktop: one line per limit with its reset time and percentage, orange at 70%, red at 90%.
+- A small app to sign in to each provider, show or hide them, pick your plan, and set their order.
+- Refreshes every 15 minutes, when you open the app, and when you tap ↻ on the widget.
+- Updates itself from GitHub releases: **About → Update** downloads the new APK and asks Android to install it.
+
+### Desktop
+
+- No visible changes. The app now runs the shared readers from `core/`, the same code Android uses.
+
+### Core
+
+- The provider catalog, usage readers, parsers and row-building moved to a shared `core/` folder used by every
+  platform, with a test fixture both platforms run.
+- The repository is split into `core/`, `desktop/` and `android/`, with per-platform guides under `docs/`.
+
 ## [1.2.1] - 2026-11-22
 
 ### Added
@@ -34,7 +54,7 @@ All notable changes to this project are listed here. The format follows
 - Ring view shows one ring per limit and widens to fit.
 - Unit tests, CI, and a tag-triggered release workflow that builds on Windows and publishes the installer.
 - Code-signing support through Azure Artifact Signing, switched on by repository secrets
-  (see [docs/CODE-SIGNING.md](docs/CODE-SIGNING.md)).
+  (see [docs/desktop/CODE-SIGNING.md](docs/desktop/CODE-SIGNING.md)).
 
 ### Changed
 
@@ -66,7 +86,8 @@ All notable changes to this project are listed here. The format follows
   minute after a one-time sign-in.
 - Colour-coded bars, reset countdowns, threshold notifications, tray icon.
 
-[Unreleased]: https://github.com/Pengopal/ai-usage-tracker-widget/compare/v1.2.1...HEAD
+[Unreleased]: https://github.com/Pengopal/ai-usage-tracker-widget/compare/v1.3.0...HEAD
+[1.3.0]: https://github.com/Pengopal/ai-usage-tracker-widget/compare/v1.2.1...v1.3.0
 [1.2.1]: https://github.com/Pengopal/ai-usage-tracker-widget/compare/v1.2.0...v1.2.1
 [1.2.0]: https://github.com/Pengopal/ai-usage-tracker-widget/compare/v1.1.0...v1.2.0
 [1.1.0]: https://github.com/Pengopal/ai-usage-tracker-widget/releases/tag/v1.1.0

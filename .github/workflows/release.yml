@@ -1,6 +1,8 @@
 name: Release
-# Push a tag like v1.2.0 (matching package.json) to build the Windows installer
-# and publish it as a GitHub release. Installed apps update from that release.
+# Push a tag like v1.3.0 to publish one GitHub release for every platform:
+# the Windows installer (desktop/) and the Android APK (android/). The tag must
+# match desktop/package.json and android/gradle.properties. Installed apps
+# update from that release.
 on:
   push:
     tags: ['v*']
@@ -13,12 +15,28 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
-  release:
+  versions:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Check the tag matches every platform's version
+        run: |
+          desktop="v$(node -p "require('./desktop/package.json').version")"
+          android="v$(sed -n 's/^appVersion=//p' android/gradle.properties)"
+          test "$desktop" = "$GITHUB_REF_NAME" || { echo "::error::Tag $GITHUB_REF_NAME does not match desktop/package.json $desktop"; exit 1; }
+          test "$android" = "$GITHUB_REF_NAME" || { echo "::error::Tag $GITHUB_REF_NAME does not match android/gradle.properties $android"; exit 1; }
+
+  desktop:
+    needs: versions
     runs-on: windows-latest
+    defaults:
+      run:
+        working-directory: desktop
+        shell: bash
     env:
       GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-      # Optional code signing (see docs/CODE-SIGNING.md). Builds stay unsigned
-      # until these secrets and variables exist.
+      # Optional code signing (see docs/desktop/CODE-SIGNING.md). Builds stay
+      # unsigned until these secrets and variables exist.
       AZURE_TENANT_ID: ${{ secrets.AZURE_TENANT_ID }}
       AZURE_CLIENT_ID: ${{ secrets.AZURE_CLIENT_ID }}
       AZURE_CLIENT_SECRET: ${{ secrets.AZURE_CLIENT_SECRET }}
@@ -32,17 +50,11 @@ jobs:
         with:
           node-version: 22
           cache: npm
+          cache-dependency-path: desktop/package-lock.json
       - run: npm ci
       - run: npm test
 
-      - name: Check the tag matches package.json
-        shell: bash
-        run: |
-          version="v$(node -p "require('./package.json').version")"
-          test "$version" = "$GITHUB_REF_NAME" || { echo "::error::Tag $GITHUB_REF_NAME does not match package.json $version"; exit 1; }
-
       - name: Build and publish
-        shell: bash
         run: |
           args=(--win --publish always)
           if [ -n "$AZURE_CLIENT_ID" ] && [ -n "$SIGN_ENDPOINT" ]; then
@@ -56,16 +68,66 @@ jobs:
           else
             echo "::warning::No signing secrets set; the installer will be unsigned"
           fi
+          npm run copy-core
           npx electron-builder "${args[@]}"
 
       - name: Release notes from CHANGELOG.md
-        shell: bash
+        working-directory: .
         run: |
           version="${GITHUB_REF_NAME#v}"
           awk -v v="$version" '
-            $0 ~ "^## \\[" v "\\]" { on = 1; next }
+            $0 ~ "^## \[" v "\]" { on = 1; next }
             on && /^## \[/ { exit }
             on { print }
           ' CHANGELOG.md > notes.md
           test -s notes.md || { echo "::error::CHANGELOG.md has no section for $version"; exit 1; }
           gh release edit "$GITHUB_REF_NAME" --title "$GITHUB_REF_NAME" --notes-file notes.md
+
+  android:
+    # Runs after the desktop job so the release already exists to attach to.
+    needs: desktop
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: android
+    env:
+      GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+      ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+      ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+      ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
+    steps:
+      - name: Skip without a signing key
+        id: key
+        run: |
+          if [ -z "$KEYSTORE_BASE64" ]; then
+            echo "::warning::No ANDROID_KEYSTORE_BASE64 secret; no APK is attached (see docs/android/README.md)"
+            echo "ok=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "ok=true" >> "$GITHUB_OUTPUT"
+          fi
+        working-directory: .
+      - uses: actions/checkout@v4
+        if: steps.key.outputs.ok == 'true'
+      - uses: actions/setup-java@v4
+        if: steps.key.outputs.ok == 'true'
+        with:
+          distribution: temurin
+          java-version: 21
+      - uses: gradle/actions/setup-gradle@v4
+        if: steps.key.outputs.ok == 'true'
+      - name: Build the signed APK
+        if: steps.key.outputs.ok == 'true'
+        run: |
+          export ANDROID_KEYSTORE_PATH="$RUNNER_TEMP/release.jks"
+          echo "$KEYSTORE_BASE64" | base64 -d > "$ANDROID_KEYSTORE_PATH"
+          ./gradlew --no-daemon testGithubDebugUnitTest assembleGithubRelease
+          rm -f "$ANDROID_KEYSTORE_PATH"
+      - name: Attach the APK to the release
+        if: steps.key.outputs.ok == 'true'
+        run: |
+          version="${GITHUB_REF_NAME#v}"
+          apk="app/build/outputs/apk/github/release/app-github-release.apk"
+          test -f "$apk" || { echo "::error::Signed APK not found at $apk"; exit 1; }
+          cp "$apk" "AI-Usage-Tracker-$version.apk"
+          gh release upload "$GITHUB_REF_NAME" "AI-Usage-Tracker-$version.apk" --clobber

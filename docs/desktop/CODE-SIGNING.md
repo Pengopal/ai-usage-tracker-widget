@@ -38,7 +38,7 @@ Azure Artifact Signing is the cheapest route for direct downloads, and the relea
    | Variable | `AZURE_SIGNING_PROFILE` | The certificate profile name |
    | Variable | `AZURE_SIGNING_PUBLISHER` | The publisher name exactly as on the certificate (its CN) |
 
-4. Push the next release tag. The [Release workflow](../.github/workflows/release.yml) signs the installer and
+4. Push the next release tag. The [Release workflow](../../.github/workflows/release.yml) signs the installer and
    the app when these are present, and builds unsigned (with a warning in the log) when they aren't.
 
 The updater checks that new versions are signed by the same publisher as the installed one, so after the first
