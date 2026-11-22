@@ -5,12 +5,16 @@ import android.content.Intent
 import android.graphics.Color
 import android.net.Uri
 import android.os.Bundle
+import android.os.Message
 import android.view.Gravity
+import android.view.ViewGroup
 import android.view.ViewGroup.LayoutParams.MATCH_PARENT
 import android.view.ViewGroup.LayoutParams.WRAP_CONTENT
 import android.webkit.CookieManager
+import android.webkit.WebChromeClient
 import android.webkit.WebView
 import android.webkit.WebViewClient
+import android.widget.FrameLayout
 import android.widget.LinearLayout
 import android.widget.TextView
 import androidx.activity.ComponentActivity
@@ -41,7 +45,12 @@ class LoginActivity : ComponentActivity() {
         val id = intent.getStringExtra(EXTRA_PROVIDER) ?: return finish()
         val provider = Catalog.load(this)[id] ?: return finish()
 
-        web = WebViews.create(this).apply { webViewClient = WebViewClient() }
+        val frame = FrameLayout(this)
+        web = WebViews.create(this, popups = true).apply {
+            webViewClient = WebViewClient()
+            webChromeClient = PopupClient(frame)
+        }
+        frame.addView(web, FrameLayout.LayoutParams(MATCH_PARENT, MATCH_PARENT))
         val header = TextView(this).apply {
             text = "Sign in to ${provider.name}"
             setTextColor(Color.parseColor("#ECECF1"))
@@ -54,7 +63,7 @@ class LoginActivity : ComponentActivity() {
             orientation = LinearLayout.VERTICAL
             setBackgroundColor(Color.parseColor("#0E0E12"))
             addView(header, LinearLayout.LayoutParams(MATCH_PARENT, WRAP_CONTENT))
-            addView(web, LinearLayout.LayoutParams(MATCH_PARENT, 0, 1f))
+            addView(frame, LinearLayout.LayoutParams(MATCH_PARENT, 0, 1f))
         }
         ViewCompat.setOnApplyWindowInsetsListener(root) { v, insets ->
             val bars = insets.getInsets(WindowInsetsCompat.Type.systemBars() or WindowInsetsCompat.Type.ime())
@@ -64,7 +73,13 @@ class LoginActivity : ComponentActivity() {
         setContentView(root)
         onBackPressedDispatcher.addCallback(this, object : OnBackPressedCallback(true) {
             override fun handleOnBackPressed() {
-                if (web.canGoBack()) web.goBack() else finish()
+                val popup = popups.lastOrNull()
+                when {
+                    popup != null && popup.canGoBack() -> popup.goBack()
+                    popup != null -> closePopup(popup)
+                    web.canGoBack() -> web.goBack()
+                    else -> finish()
+                }
             }
         })
         web.loadUrl(provider.loginUrl)
@@ -89,7 +104,37 @@ class LoginActivity : ComponentActivity() {
         }
     }
 
+    /** Popup windows the sign-in page opened, newest last. They sit on top of [web]. */
+    private val popups = mutableListOf<WebView>()
+
+    /**
+     * Opens window.open() popups (such as Google sign-in) as real child windows over the
+     * page, so they can hand the sign-in back to it and close themselves.
+     */
+    private inner class PopupClient(private val frame: FrameLayout) : WebChromeClient() {
+        override fun onCreateWindow(view: WebView, isDialog: Boolean, isUserGesture: Boolean, resultMsg: Message): Boolean {
+            val popup = WebViews.create(this@LoginActivity, popups = true).apply {
+                webViewClient = WebViewClient()
+                webChromeClient = this@PopupClient
+            }
+            popups += popup
+            frame.addView(popup, FrameLayout.LayoutParams(MATCH_PARENT, MATCH_PARENT))
+            (resultMsg.obj as WebView.WebViewTransport).webView = popup
+            resultMsg.sendToTarget()
+            return true
+        }
+
+        override fun onCloseWindow(window: WebView) = closePopup(window)
+    }
+
+    private fun closePopup(popup: WebView) {
+        if (!popups.remove(popup)) return
+        (popup.parent as? ViewGroup)?.removeView(popup)
+        popup.destroy()
+    }
+
     override fun onDestroy() {
+        popups.toList().forEach(::closePopup)
         if (::web.isInitialized) web.destroy()
         super.onDestroy()
     }

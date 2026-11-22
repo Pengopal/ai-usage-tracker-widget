@@ -17,12 +17,18 @@ object WebViews {
      * A WebView set up like the user's mobile Chrome: sign-in and sync share the
      * same cookie store and user agent, so sessions (and Cloudflare clearance)
      * carry over between them.
+     *
+     * [popups] lets the page open real child windows. Sign-in needs it: "Continue
+     * with Google" (on Claude, Grok and X) opens a popup that hands the result
+     * back to the page that opened it. Opened in place, the popup replaces its opener and
+     * the sign-in ends on a blank page.
      */
     @SuppressLint("SetJavaScriptEnabled")
-    fun create(context: Context): WebView = WebView(context).apply {
+    fun create(context: Context, popups: Boolean = false): WebView = WebView(context).apply {
         settings.javaScriptEnabled = true
         settings.domStorageEnabled = true
-        settings.setSupportMultipleWindows(false) // sign-in popups open in place
+        settings.setSupportMultipleWindows(popups)
+        settings.javaScriptCanOpenWindowsAutomatically = popups
         settings.userAgentString = settings.userAgentString
             .replace("; wv)", ")")
             .replace(Regex("Version/\\S+ "), "")
