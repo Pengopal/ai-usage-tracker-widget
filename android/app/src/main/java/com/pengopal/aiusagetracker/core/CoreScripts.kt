@@ -50,4 +50,17 @@ object CoreScripts {
         val t = JSONObject.quote(token)
         return "(function(){var R=window.__aiutResults;return (R&&R[$t])||null;})()"
     }
+    /** [state] results other than a reader's JSON. */
+    const val IDLE = "idle"
+    const val RUNNING = "running"
+
+    /**
+     * Evaluates to [IDLE] when this page has no reader for [token] (none started
+     * yet, or a navigation replaced the page), [RUNNING] while it runs, and then
+     * the result JSON string.
+     */
+    fun state(token: String): String {
+        val t = JSONObject.quote(token)
+        return "(function(){var R=window.__aiutResults;if(!R||R[$t]===undefined)return '$IDLE';return R[$t]===null?'$RUNNING':R[$t];})()"
+    }
 }

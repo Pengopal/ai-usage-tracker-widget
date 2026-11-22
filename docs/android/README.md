@@ -25,7 +25,7 @@ Needs Android 8.0 or newer. A Play Store version is planned; until then the APK 
 - **Providers:** show or hide each one, pick your plan (or leave it on Auto-detect), move them up or down, and
   sign out. The widget follows the same choices.
 - **Signing in** opens the provider's own login page inside the app. The page closes by itself once the app can
-  read your usage. "Continue with Google" doesn't work inside apps, so use email sign-in.
+  read your usage. Email, Google and X sign-in all work; Google opens in a window on top and closes by itself.
 
 <br clear="right">
 

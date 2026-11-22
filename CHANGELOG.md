@@ -12,6 +12,14 @@ All notable changes to this project are listed here. The format follows
   The app still targets API 36, so its behaviour is unchanged.
 - Updated Compose (BOM 2026.11.01), WorkManager 2.12 and Kotlin 2.4.
 
+### Fixed
+
+- **Android:** refreshing from the widget no longer times out. Each provider's reader starts as soon as its page
+  is on the provider's site instead of waiting for the whole web app to load, which in the background could take
+  longer than the 45-second limit.
+- **Android:** "Continue with Google" sign-in no longer ends on a white screen. Sign-in popups now open as a
+  window over the page, so they can hand the sign-in back to it.
+
 ### Desktop
 
 - Updated to Electron 45 and electron-builder 26.

@@ -132,9 +132,8 @@ private fun Screen() {
             }
         }
         Hint(
-            "Sign in opens the real login page and closes by itself once you're in. Google sign-in doesn't work " +
-                "inside apps, so use email sign-in. \"Auto\" shows every limit your account reports; pick your plan " +
-                "to show only that plan's limits.",
+            "Sign in opens the real login page and closes by itself once you're in. \"Auto\" shows every limit " +
+                "your account reports; pick your plan to show only that plan's limits.",
         )
 
         Section("Widget")
