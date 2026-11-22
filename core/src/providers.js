@@ -1,51 +1,10 @@
 // What each provider tracks, the plans people can pick, and which limits a plan
 // shows. "Auto" shows every limit the account reports; picking a plan narrows
 // the widget to that plan's limits (e.g. Claude Max 20x shows only weekly).
-// Pure data and functions, shared by the main process and the tests.
+// Pure data and functions, shared by every platform and the tests.
 
-const CATALOG = {
-  claude: {
-    name: 'Claude',
-    logo: 'i-claude',
-    url: 'https://claude.ai/settings/usage',
-    metrics: { session: '5-hour', weekly: 'Weekly' },
-    plans: {
-      free: { label: 'Free', metrics: ['session', 'weekly'] },
-      pro: { label: 'Pro', metrics: ['session', 'weekly'] },
-      max: { label: 'Max', metrics: ['session', 'weekly'], hidden: true }, // detected, multiplier unknown
-      max5: { label: 'Max 5x', metrics: ['session', 'weekly'] },
-      max20: { label: 'Max 20x', metrics: ['weekly'] },
-      team: { label: 'Team', metrics: ['session', 'weekly'] },
-      enterprise: { label: 'Enterprise', metrics: ['session', 'weekly'] },
-    },
-  },
-  openai: {
-    name: 'ChatGPT',
-    logo: 'i-openai',
-    url: 'https://chatgpt.com/',
-    metrics: { session: '5-hour', weekly: 'Weekly' },
-    plans: {
-      free: { label: 'Free', metrics: ['session', 'weekly'] },
-      plus: { label: 'Plus', metrics: ['session', 'weekly'] },
-      pro: { label: 'Pro', metrics: ['session', 'weekly'] },
-      business: { label: 'Business', metrics: ['session', 'weekly'] },
-      enterprise: { label: 'Enterprise', metrics: ['session', 'weekly'] },
-    },
-  },
-  grok: {
-    name: 'Grok',
-    logo: 'i-xai',
-    url: 'https://grok.com/',
-    metrics: { weekly: 'Weekly' },
-    plans: {
-      free: { label: 'Free', metrics: ['weekly'] },
-      supergrok: { label: 'SuperGrok', metrics: ['weekly'] },
-      heavy: { label: 'SuperGrok Heavy', metrics: ['weekly'] },
-      xpremium: { label: 'X Premium', metrics: ['weekly'] },
-      xpremiumplus: { label: 'X Premium+', metrics: ['weekly'] },
-    },
-  },
-};
+// Shared with the Android app, which reads the same file from its assets.
+const CATALOG = require('./catalog.json');
 
 const PROVIDER_IDS = Object.keys(CATALOG);
 

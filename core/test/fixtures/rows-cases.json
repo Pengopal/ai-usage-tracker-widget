@@ -1,0 +1,59 @@
+{
+  "_comment": "Shared by core/test/providers.test.js and the Android RowsTest, so every platform builds the same rows.",
+  "services": {
+    "claude": { "connected": true, "plan": "max20", "windows": { "session": { "pct": 10, "reset": null }, "weekly": { "pct": 40, "reset": null } } },
+    "openai": { "connected": false, "windows": {} },
+    "grok": { "connected": true, "windows": { "weekly": { "pct": 43, "reset": null } } }
+  },
+  "cases": [
+    {
+      "name": "auto plan shows every reported limit, labelled with the detected plan",
+      "providers": {},
+      "order": null,
+      "expect": [
+        { "id": "claude", "plan": "Max 20x", "connected": true, "metrics": ["5-hour", "Weekly"] },
+        { "id": "openai", "plan": null, "connected": false, "metrics": [] },
+        { "id": "grok", "plan": null, "connected": true, "metrics": ["Weekly"] }
+      ]
+    },
+    {
+      "name": "choosing Claude Max 20x shows only the weekly limit",
+      "providers": { "claude": { "enabled": true, "plan": "max20" } },
+      "order": null,
+      "expect": [
+        { "id": "claude", "plan": "Max 20x", "connected": true, "metrics": ["Weekly"] },
+        { "id": "openai", "plan": null, "connected": false, "metrics": [] },
+        { "id": "grok", "plan": null, "connected": true, "metrics": ["Weekly"] }
+      ]
+    },
+    {
+      "name": "hidden providers are left out",
+      "providers": { "grok": { "enabled": false, "plan": "auto" } },
+      "order": null,
+      "expect": [
+        { "id": "claude", "plan": "Max 20x", "connected": true, "metrics": ["5-hour", "Weekly"] },
+        { "id": "openai", "plan": null, "connected": false, "metrics": [] }
+      ]
+    },
+    {
+      "name": "rows follow the chosen order; unknown and repeated ids are ignored",
+      "providers": {},
+      "order": ["grok", "gemini", "grok", "claude"],
+      "expect": [
+        { "id": "grok", "plan": null, "connected": true, "metrics": ["Weekly"] },
+        { "id": "claude", "plan": "Max 20x", "connected": true, "metrics": ["5-hour", "Weekly"] },
+        { "id": "openai", "plan": null, "connected": false, "metrics": [] }
+      ]
+    },
+    {
+      "name": "a chosen plan labels the row even before the account reports one",
+      "providers": { "openai": { "enabled": true, "plan": "plus" } },
+      "order": ["openai"],
+      "expect": [
+        { "id": "openai", "plan": "Plus", "connected": false, "metrics": [] },
+        { "id": "claude", "plan": "Max 20x", "connected": true, "metrics": ["5-hour", "Weekly"] },
+        { "id": "grok", "plan": null, "connected": true, "metrics": ["Weekly"] }
+      ]
+    }
+  ]
+}

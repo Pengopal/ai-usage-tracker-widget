@@ -1,6 +1,7 @@
 const test = require('node:test');
 const assert = require('node:assert/strict');
 const { buildRows, defaultProviderSettings, planOptions, orderedIds } = require('../src/providers');
+const fixture = require('./fixtures/rows-cases.json');
 
 const services = {
   claude: { connected: true, plan: 'max20', windows: { session: { pct: 10, reset: null }, weekly: { pct: 40, reset: null } } },
@@ -48,3 +49,15 @@ test('the plan picker offers Auto first and no internal-only plans', () => {
   assert.ok(keys.includes('max20'));
   assert.ok(!keys.includes('max'));
 });
+
+// The same cases run in the Android unit tests (RowsTest.kt).
+for (const c of fixture.cases) {
+  test(`shared case: ${c.name}`, () => {
+    const settings = { ...defaultProviderSettings(), ...c.providers };
+    const rows = buildRows(fixture.services, settings, {}, c.order ?? undefined);
+    assert.deepEqual(
+      rows.map((r) => ({ id: r.id, plan: r.plan, connected: r.connected, metrics: r.metrics.map((m) => m.label) })),
+      c.expect,
+    );
+  });
+}
