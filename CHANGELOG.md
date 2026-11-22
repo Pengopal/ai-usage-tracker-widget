@@ -6,6 +6,16 @@ All notable changes to this project are listed here. The format follows
 
 ## [Unreleased]
 
+### Android
+
+- Builds with Android Gradle Plugin 9.5 (built-in Kotlin) and Gradle 9.9, and compiles against Android API 37.1.
+  The app still targets API 36, so its behaviour is unchanged.
+- Updated Compose (BOM 2026.11.01), WorkManager 2.12 and Kotlin 2.4.
+
+### Desktop
+
+- Updated to Electron 45 and electron-builder 26.
+
 ## [1.3.0] - 2026-11-22
 
 ### Android
