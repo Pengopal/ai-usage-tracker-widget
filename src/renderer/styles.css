@@ -99,19 +99,15 @@ body[data-view="rings"] .bars-only { display: none; }
 .ghost-icon svg { width: 11px; height: 11px; fill: currentColor; }
 .ghost-icon:hover { color: var(--text); background: var(--raise); }
 
-/* One line per limit: label and % on the left, reset (or pace) on the right. */
+/* One line per limit: name, reset countdown, and the percentage at the far right. */
 .meter + .meter { margin-top: 5px; }
-.meter-row { display: flex; align-items: baseline; gap: 6px; line-height: 1.25; white-space: nowrap; }
-.label { color: var(--muted); font-size: 12px; }
-.pct { font-weight: 650; font-size: 12.5px; font-variant-numeric: tabular-nums; transition: color .5s; }
-.spark { margin-left: auto; align-self: center; width: 40px; height: 12px; flex-shrink: 0; overflow: visible; }
-.spark polyline { fill: none; stroke: var(--faint); stroke-width: 1.2; vector-effect: non-scaling-stroke; stroke-linejoin: round; }
-.spark.empty { visibility: hidden; }
-.right {
+.meter-row { display: flex; align-items: baseline; gap: 8px; line-height: 1.25; white-space: nowrap; }
+.label { color: var(--muted); font-size: 12px; flex-shrink: 0; }
+.reset {
   min-width: 0; overflow: hidden; text-overflow: ellipsis;
   color: var(--faint); font-size: 11px; font-variant-numeric: tabular-nums;
 }
-.right.alert { color: var(--warn); }
+.pct { margin-left: auto; flex-shrink: 0; font-weight: 650; font-size: 12.5px; font-variant-numeric: tabular-nums; transition: color .5s; }
 .bar { height: 3px; background: var(--track); border-radius: 99px; overflow: hidden; margin-top: 3px; }
 .fill { height: 100%; width: 0; border-radius: 99px; background: var(--ok); transition: width .6s ease, background-color .5s ease; }
 .meter.warn .fill { background: var(--warn); }
@@ -165,13 +161,32 @@ body[data-view="rings"] .bars-only { display: none; }
 }
 #settings h3:first-child { margin-top: 2px; }
 .account-row { display: flex; align-items: center; gap: 10px; padding: 6px 0; }
+.account { position: relative; }
 .account + .account { border-top: 1px solid var(--line); }
+
+/* Drag-to-reorder. Rows move with transforms only; the DOM order changes on drop. */
+.grip {
+  flex-shrink: 0; width: 14px; height: 26px; margin: 0 -2px 0 -4px; padding: 0;
+  display: inline-flex; align-items: center; justify-content: center;
+  border: 0; border-radius: 4px; background: none; color: var(--faint);
+  cursor: grab; touch-action: none;
+}
+.grip svg { width: 8px; height: 14px; fill: currentColor; }
+.grip:hover, .grip:focus-visible { color: var(--text); }
+.account.shifting { transition: transform .2s cubic-bezier(.2, .8, .2, 1); }
+.account.lifted {
+  z-index: 2; background: var(--raise); border-radius: 8px; border-color: transparent;
+  box-shadow: 0 8px 22px rgba(0, 0, 0, .5), 0 0 0 1px var(--line);
+}
+.account.lifted + .account { border-top-color: transparent; }
+body.reordering, body.reordering * { cursor: grabbing !important; user-select: none; }
+@media (prefers-reduced-motion: reduce) { .account.shifting { transition: none; } }
 .account-text { flex: 1; min-width: 0; }
 .account-name { font-weight: 600; font-size: 12.5px; }
 .account-status { color: var(--muted); font-size: 11.5px; margin-top: 1px; }
 .account-status.ok { color: var(--ok); }
 .hint { margin: 4px 0 0; color: var(--faint); font-size: 11px; line-height: 1.45; }
-.account-controls { display: flex; gap: 8px; padding: 0 0 8px 23px; }
+.account-controls { display: flex; gap: 8px; padding: 0 0 8px 41px; }
 .account.off .account-controls { display: none; }
 .account.off .account-name { color: var(--muted); }
 .plan-select {

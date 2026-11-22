@@ -37,23 +37,13 @@ function untilReset(iso, now) {
   return ms > 0 ? ms : 0;
 }
 
-function sparkPoints(series, now) {
-  if (!series || series.length < 2) return '';
-  const t0 = series[0][0];
-  const span = Math.max(now - t0, MINUTE);
-  return series.map(([t, v]) => `${(((t - t0) / span) * 40).toFixed(1)},${(12 - (Math.min(100, v) / 100) * 12).toFixed(1)}`).join(' ');
-}
-
 function setLogo(svg, row) {
   svg.querySelector('use').setAttribute('href', `#${row.logo}`);
   svg.classList.toggle('claude', row.id === 'claude');
 }
 
-// Right-hand text of a limit: pace warning first, then reset countdown.
-function rightText(m, now) {
-  if (m.pace != null) {
-    return { text: `Out in ~${formatDuration(m.pace)}`, alert: true, title: 'At your pace over the last hour, this runs out before it resets' };
-  }
+// The countdown shown next to a limit's name.
+function resetText(m, now) {
   const left = untilReset(m.reset, now);
   if (left != null) {
     return { text: left === 0 ? 'Resetting…' : `Resets in ${formatDuration(left)}`, title: new Date(m.reset).toLocaleString() };
@@ -82,14 +72,10 @@ function renderBars(now) {
       meter.querySelector('.label').textContent = m.label;
       meter.querySelector('.pct').textContent = `${Math.round(m.pct)}%`;
       meter.querySelector('.fill').style.width = `${Math.min(100, m.pct)}%`;
-      const points = sparkPoints(m.spark, now);
-      meter.querySelector('.spark polyline').setAttribute('points', points);
-      meter.querySelector('.spark').classList.toggle('empty', !points);
-      const right = rightText(m, now);
-      const r = meter.querySelector('.right');
-      r.textContent = right.text;
-      r.classList.toggle('alert', !!right.alert);
-      if (right.title) r.title = right.title;
+      const reset = resetText(m, now);
+      const r = meter.querySelector('.reset');
+      r.textContent = reset.text;
+      if (reset.title) r.title = reset.title;
       metrics.append(meter);
     }
     if (row.connected && !row.metrics.length && !row.error) {
@@ -130,7 +116,7 @@ function ringFor(row, m, now) {
   arc.style.strokeDashoffset = RING_LEN * (1 - Math.min(100, m.pct) / 100);
   el.querySelector('.ring-pct').textContent = `${Math.round(m.pct)}%`;
   const left = untilReset(m.reset, now);
-  sub.textContent = m.pace != null ? `out ~${formatDuration(m.pace)}` : left ? formatDuration(left) : '';
+  sub.textContent = left ? formatDuration(left) : '';
   el.title = `${row.name} ${m.label}${m.reset ? ` · resets ${new Date(m.reset).toLocaleString()}` : ''}`;
   return el;
 }
@@ -183,6 +169,135 @@ function updateText(up) {
   }
 }
 
+// ---------- Provider reordering ----------
+// Rows follow the pointer with transforms only. On drop the DOM is reordered
+// and every row glides from where it was drawn to its new slot (FLIP).
+let drag = null;
+let orderSaving = false;
+
+// Runs `mutate` (a DOM reorder) and animates each row from its old spot.
+function flip(box, mutate) {
+  const rows = [...box.children];
+  const before = new Map(rows.map((r) => [r, r.getBoundingClientRect().top]));
+  for (const r of rows) {
+    r.classList.remove('shifting');
+    r.style.transform = '';
+  }
+  mutate();
+  for (const r of rows) {
+    const d = before.get(r) - r.getBoundingClientRect().top;
+    r.style.transform = d ? `translateY(${d}px)` : '';
+  }
+  void box.offsetHeight; // commit the starting positions before animating
+  for (const r of rows) {
+    r.classList.add('shifting');
+    r.style.transform = '';
+  }
+}
+
+async function saveOrder(box) {
+  const ids = [...box.children].map((r) => r.dataset.provider);
+  // Show the new order right away; the saved snapshot follows.
+  const rank = (id) => ids.indexOf(id);
+  data.providers.sort((a, b) => rank(a.id) - rank(b.id));
+  data.rows.sort((a, b) => rank(a.id) - rank(b.id));
+  orderSaving = true;
+  try {
+    data = await window.api.saveOrder(ids);
+  } finally {
+    orderSaving = false;
+  }
+  render();
+}
+
+function startDrag(e, el) {
+  if (e.button !== 0 || drag) return;
+  e.preventDefault();
+  const box = $('provider-settings');
+  const rows = [...box.children];
+  if (rows.length < 2) return;
+  const scroller = $('settings');
+  const from = rows.indexOf(el);
+  drag = {
+    el, box, rows, scroller, from, to: from,
+    startY: e.clientY,
+    startScroll: scroller.scrollTop,
+    tops: rows.map((r) => r.offsetTop),
+    heights: rows.map((r) => r.offsetHeight),
+  };
+  // Follow the pointer on the window, so the drop lands wherever it is released.
+  try { e.currentTarget.setPointerCapture(e.pointerId); } catch {}
+  window.addEventListener('pointermove', moveDrag);
+  window.addEventListener('pointerup', endDrag);
+  window.addEventListener('pointercancel', endDrag);
+  window.addEventListener('blur', endDrag);
+  document.body.classList.add('reordering');
+  el.classList.remove('shifting');
+  el.classList.add('lifted');
+  for (const r of rows) if (r !== el) r.classList.add('shifting');
+}
+
+function moveDrag(e) {
+  if (!drag) return;
+  const { el, rows, from, tops, heights } = drag;
+  const last = rows.length - 1;
+  const raw = e.clientY - drag.startY + drag.scroller.scrollTop - drag.startScroll;
+  // Keep the lifted row inside the list.
+  const dy = Math.max(tops[0] - tops[from], Math.min(raw, tops[last] + heights[last] - tops[from] - heights[from]));
+  el.style.transform = `translateY(${dy}px)`;
+
+  // Its new slot: a row makes way once the lifted row's leading edge crosses
+  // that row's midpoint.
+  const top = tops[from] + dy;
+  const bottom = top + heights[from];
+  let to = from;
+  rows.forEach((r, i) => {
+    const mid = tops[i] + heights[i] / 2;
+    if (i > from && bottom > mid) to++;
+    if (i < from && top < mid) to--;
+  });
+  if (to === drag.to) return;
+  drag.to = to;
+  rows.forEach((r, i) => {
+    if (i === from) return;
+    let shift = 0;
+    if (from < to && i > from && i <= to) shift = -heights[from];
+    if (to < from && i >= to && i < from) shift = heights[from];
+    r.style.transform = shift ? `translateY(${shift}px)` : '';
+  });
+}
+
+function endDrag() {
+  if (!drag) return;
+  const { el, box, rows, from, to } = drag;
+  drag = null;
+  window.removeEventListener('pointermove', moveDrag);
+  window.removeEventListener('pointerup', endDrag);
+  window.removeEventListener('pointercancel', endDrag);
+  window.removeEventListener('blur', endDrag);
+  document.body.classList.remove('reordering');
+  el.classList.remove('lifted');
+  flip(box, () => {
+    if (to === from) return;
+    const others = rows.filter((r) => r !== el);
+    box.insertBefore(el, others[to] || null);
+  });
+  if (to !== from) saveOrder(box);
+}
+
+// Arrow keys move the focused row one place. The neighbour is the node that
+// moves in the DOM, so the focused grip never loses focus.
+function keyMove(e, el) {
+  const up = e.key === 'ArrowUp';
+  if (!up && e.key !== 'ArrowDown') return;
+  e.preventDefault();
+  const box = el.parentElement;
+  const other = up ? el.previousElementSibling : el.nextElementSibling;
+  if (!other) return;
+  flip(box, () => (up ? box.insertBefore(other, el.nextSibling) : box.insertBefore(other, el)));
+  saveOrder(box);
+}
+
 // Provider rows in settings are built once and then updated in place, so a
 // select or switch keeps focus while syncs come in.
 function renderProviderSettings() {
@@ -192,6 +307,10 @@ function renderProviderSettings() {
     if (!el) {
       el = clone('tpl-provider-setting');
       el.dataset.provider = p.id;
+      const grip = el.querySelector('.grip');
+      grip.setAttribute('aria-label', `Move ${p.name} (arrow keys)`);
+      grip.addEventListener('pointerdown', (e) => startDrag(e, el));
+      grip.addEventListener('keydown', (e) => keyMove(e, el));
       setLogo(el.querySelector('.logo'), p);
       el.querySelector('.account-name').textContent = p.name;
       const select = el.querySelector('.plan-select');
@@ -228,6 +347,13 @@ function renderProviderSettings() {
     btn.textContent = p.connected ? 'Sign out' : 'Sign in';
     btn.classList.toggle('primary', !p.connected);
   }
+  // Match the saved order, unless a drag or save is mid-flight. Rows only move
+  // when out of place, so a focused control isn't pulled out of the page.
+  if (drag || orderSaving) return;
+  data.providers.forEach((p, i) => {
+    const el = box.querySelector(`[data-provider="${p.id}"]`);
+    if (box.children[i] !== el) box.insertBefore(el, box.children[i] || null);
+  });
 }
 
 function renderSettings() {

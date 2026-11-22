@@ -47,7 +47,7 @@
     <div class="inner">
       <h3>Providers</h3>
       <div id="provider-settings"></div>
-      <p class="hint">Sign in opens the real login. It closes by itself once you're in. If Google sign-in is blocked there, use email sign-in. "Auto" shows every limit your account reports; pick your plan to show only that plan's limits.</p>
+      <p class="hint">Drag the handle to reorder. Sign in opens the real login. It closes by itself once you're in. If Google sign-in is blocked there, use email sign-in. "Auto" shows every limit your account reports; pick your plan to show only that plan's limits.</p>
 
       <h3>Alerts</h3>
       <label class="switch-row"><span>Notifications</span><input type="checkbox" id="set-notify"><i></i></label>
@@ -87,9 +87,8 @@
     <div class="meter">
       <div class="meter-row">
         <span class="label"></span>
+        <span class="reset"></span>
         <span class="pct"></span>
-        <svg class="spark" viewBox="0 0 40 12" preserveAspectRatio="none"><polyline/></svg>
-        <span class="right"></span>
       </div>
       <div class="bar"><div class="fill"></div></div>
     </div>
@@ -107,6 +106,9 @@
   <template id="tpl-provider-setting">
     <div class="account">
       <div class="account-row">
+        <button type="button" class="grip" title="Drag to reorder (or use arrow keys)">
+          <svg viewBox="0 0 8 14" aria-hidden="true"><circle cx="2" cy="2" r="1.2"/><circle cx="6" cy="2" r="1.2"/><circle cx="2" cy="7" r="1.2"/><circle cx="6" cy="7" r="1.2"/><circle cx="2" cy="12" r="1.2"/><circle cx="6" cy="12" r="1.2"/></svg>
+        </button>
         <svg class="logo"><use/></svg>
         <div class="account-text">
           <div class="account-name"></div>

@@ -33,8 +33,8 @@ while there's still time to slow down.
 
 ### Every limit at a glance
 
-One line per limit: how much you've used, when it resets, and a 24-hour trend line. Bars turn orange at 70%
-and red at 90%.
+One line per limit: its name, when it resets, and how much you've used, with a thin bar under it. Bars turn
+orange at 70% and red at 90%.
 
 | Detailed | Compact rings |
 | :---: | :---: |
@@ -43,7 +43,7 @@ and red at 90%.
 ### Warnings before you run out
 
 - **Pace heads-up**: from your last hour of use, the widget works out when a limit will run out. If that's
-  before it resets, you see "Out in ~1h 8m" and get a notification about 30 minutes ahead.
+  before it resets, you get a notification about 30 minutes ahead.
 - **Threshold alerts** at the percentages you choose (75, 90 and 100% by default), once per reset window.
 - **Limit-back alert** when a limit you'd nearly used up resets.
 
@@ -53,7 +53,8 @@ and red at 90%.
 
 Each provider has a switch to show or hide it and a plan picker. **Auto-detect** shows every limit your account
 reports and labels the plan it finds. Picking a plan shows only that plan's limits — for example, Claude
-**Max 20x** shows just the weekly limit.
+**Max 20x** shows just the weekly limit. Drag a provider by its handle (or focus the handle and use the arrow
+keys) to set the order the widget lists them in.
 
 | Provider | Limits shown | Plans |
 | --- | --- | --- |
@@ -118,7 +119,7 @@ Everything stays on your PC, in `%APPDATA%\ai-usage-tracker-widget\`:
 | File | Holds |
 | --- | --- |
 | `usage-data.json` | Last readings and settings |
-| `history.json` | Seven days of readings, for pace and trend lines |
+| `history.json` | Seven days of readings, for the pace heads-up |
 | `sync-debug-*.json` | The last raw usage response per provider |
 | `Partitions\` | The login sessions |
 
@@ -152,7 +153,7 @@ npm run build
 | `src/sync.js` | Sign-in windows and the per-provider usage readers |
 | `src/parsers.js` | Turns each provider's response into the common shape |
 | `src/providers.js` | Providers, plans, and which limits each plan shows |
-| `src/insights.js` | Burn-rate pace and trend lines from history |
+| `src/insights.js` | Burn-rate pace from history |
 | `src/store.js` | Readings, settings and history on disk |
 | `src/updater.js` | Updates from GitHub Releases |
 | `src/renderer/` | The widget UI |

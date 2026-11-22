@@ -6,6 +6,21 @@ All notable changes to this project are listed here. The format follows
 
 ## [Unreleased]
 
+## [1.2.1] - 2026-11-22
+
+### Added
+
+- **Reorder providers**: drag a provider by its handle in Settings, or focus the handle and use the arrow
+  keys. The widget, ring view and tray menu follow that order.
+
+### Changed
+
+- Each limit is one line: its name on the left, "Resets in …" next to it, and the percentage on the right.
+
+### Removed
+
+- The trend line and the "Out in …" estimate from the widget. The pace heads-up notification stays.
+
 ## [1.2.0] - 2026-11-22
 
 ### Added
@@ -51,6 +66,7 @@ All notable changes to this project are listed here. The format follows
   minute after a one-time sign-in.
 - Colour-coded bars, reset countdowns, threshold notifications, tray icon.
 
-[Unreleased]: https://github.com/Pengopal/ai-usage-tracker-widget/compare/v1.2.0...HEAD
+[Unreleased]: https://github.com/Pengopal/ai-usage-tracker-widget/compare/v1.2.1...HEAD
+[1.2.1]: https://github.com/Pengopal/ai-usage-tracker-widget/compare/v1.2.0...v1.2.1
 [1.2.0]: https://github.com/Pengopal/ai-usage-tracker-widget/compare/v1.1.0...v1.2.0
 [1.1.0]: https://github.com/Pengopal/ai-usage-tracker-widget/releases/tag/v1.1.0

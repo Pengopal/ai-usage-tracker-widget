@@ -1,7 +1,7 @@
 {
   "name": "ai-usage-tracker-widget",
   "productName": "AI Usage Tracker Widget",
-  "version": "1.2.0",
+  "version": "1.2.1",
   "description": "Compact always-on-top Windows widget showing your live Claude, ChatGPT and Grok usage limits.",
   "main": "src/main.js",
   "author": "Muhammad Furqan",

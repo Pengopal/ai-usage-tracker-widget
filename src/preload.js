@@ -4,6 +4,7 @@ contextBridge.exposeInMainWorld('api', {
   getData: () => ipcRenderer.invoke('get-data'),
   saveSettings: (patch) => ipcRenderer.invoke('save-settings', patch),
   saveProvider: (id, patch) => ipcRenderer.invoke('save-provider', id, patch),
+  saveOrder: (ids) => ipcRenderer.invoke('save-order', ids),
   setView: (view) => ipcRenderer.send('set-view', view),
   syncNow: () => ipcRenderer.send('sync-now'),
   signIn: (id) => ipcRenderer.send('sign-in', id),
