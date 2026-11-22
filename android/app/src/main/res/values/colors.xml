@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Same tokens as desktop/src/renderer/styles.css -->
+<resources>
+    <color name="bg">#FF0E0E12</color>
+    <color name="raise">#FF17171D</color>
+    <color name="track">#FF23232B</color>
+    <color name="text">#FFECECF1</color>
+    <color name="muted">#FFA3A3AE</color>
+    <color name="faint">#FF80808C</color>
+    <color name="ok">#FF5FAE84</color>
+    <color name="warn">#FFD9944F</color>
+    <color name="danger">#FFDD6663</color>
+    <color name="accent">#FF6AA8FF</color>
+</resources>

@@ -1,0 +1,63 @@
+{
+  "name": "ai-usage-tracker-widget",
+  "productName": "AI Usage Tracker Widget",
+  "version": "1.3.0",
+  "description": "Compact always-on-top Windows widget showing your live Claude, ChatGPT and Grok usage limits.",
+  "main": "src/main.js",
+  "author": "Muhammad Furqan",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/Pengopal/ai-usage-tracker-widget.git"
+  },
+  "scripts": {
+    "copy-core": "node scripts/copy-core.js",
+    "start": "npm run copy-core && electron .",
+    "test": "npm run copy-core && node --test \"test/*.test.js\"",
+    "build": "npm run copy-core && electron-builder --win",
+    "build:portable": "npm run copy-core && electron-builder --win portable",
+    "release": "npm run copy-core && electron-builder --win --publish always"
+  },
+  "dependencies": {
+    "electron-updater": "^6.3.9"
+  },
+  "devDependencies": {
+    "electron": "^33.2.1",
+    "electron-builder": "^25.1.8"
+  },
+  "build": {
+    "appId": "com.mufurqan.aiusagetracker",
+    "productName": "AI Usage Tracker Widget",
+    "files": [
+      "src/**/*",
+      "package.json"
+    ],
+    "directories": {
+      "output": "dist"
+    },
+    "publish": [
+      {
+        "provider": "github",
+        "owner": "Pengopal",
+        "repo": "ai-usage-tracker-widget",
+        "releaseType": "release"
+      }
+    ],
+    "win": {
+      "target": [
+        "nsis",
+        "portable"
+      ]
+    },
+    "nsis": {
+      "artifactName": "AI-Usage-Tracker-Setup-${version}.${ext}",
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true,
+      "createDesktopShortcut": true,
+      "shortcutName": "AI Usage Tracker"
+    },
+    "portable": {
+      "artifactName": "AI-Usage-Tracker-Portable-${version}.${ext}"
+    }
+  }
+}

@@ -1,10 +1,10 @@
 <div align="center">
 
-<img src="docs/images/bars.png" alt="AI Usage Tracker widget showing Claude, ChatGPT and Grok limits" width="320">
+<img src="docs/desktop/images/bars.png" alt="AI Usage Tracker widget showing Claude, ChatGPT and Grok limits" width="320">
 
 # AI Usage Tracker
 
-**Your Claude, ChatGPT and Grok limits, live on your desktop — with a heads-up before you run out.**
+**Your Claude, ChatGPT and Grok limits, live on your desktop and your phone — with a heads-up before you run out.**
 
 [![Release](https://img.shields.io/github/v/release/Pengopal/ai-usage-tracker-widget?color=6aa8ff)](https://github.com/Pengopal/ai-usage-tracker-widget/releases/latest)
 [![CI](https://github.com/Pengopal/ai-usage-tracker-widget/actions/workflows/ci.yml/badge.svg)](https://github.com/Pengopal/ai-usage-tracker-widget/actions/workflows/ci.yml)
@@ -13,11 +13,10 @@
 <sub><b>Built with</b></sub><br>
 [![Electron](https://img.shields.io/badge/Electron-2b2e3a?logo=electron&logoColor=9feaf9)](https://www.electronjs.org)
 [![Node.js](https://img.shields.io/badge/Node.js-5fa04e?logo=nodedotjs&logoColor=white)](https://nodejs.org)
-[![JavaScript](https://img.shields.io/badge/JavaScript-f7df1e?logo=javascript&logoColor=black)](https://developer.mozilla.org/docs/Web/JavaScript)
-[![electron-builder](https://img.shields.io/badge/electron--builder-1a1a1a)](https://www.electron.build)
-[![Windows](https://img.shields.io/badge/Windows_10%2F11-0078d4?logo=windows&logoColor=white)](https://www.microsoft.com/windows)
+[![Kotlin](https://img.shields.io/badge/Kotlin-7f52ff?logo=kotlin&logoColor=white)](https://kotlinlang.org)
+[![Jetpack Glance](https://img.shields.io/badge/Jetpack_Glance-3ddc84?logo=android&logoColor=white)](https://developer.android.com/jetpack/compose/glance)
 
-**[Download for Windows](https://github.com/Pengopal/ai-usage-tracker-widget/releases/latest)**
+**[Download](https://github.com/Pengopal/ai-usage-tracker-widget/releases/latest)**
 
 </div>
 
@@ -26,157 +25,75 @@
 Claude, ChatGPT and Grok all ration usage in windows — five hours, a week — and each hides its meter on a
 different settings page. You find out you're out when a reply stops halfway.
 
-AI Usage Tracker keeps every limit in one small, always-on-top window, refreshed every minute, and warns you
-while there's still time to slow down.
+AI Usage Tracker puts every limit in one place, refreshed on its own: an always-on-top window on Windows and a
+home-screen widget on Android.
 
-## Features
+## Platforms
 
-### Every limit at a glance
+| Platform | What you get | Download | Guide |
+| --- | --- | --- | --- |
+| **Windows 10/11** | Always-on-top widget, tray icon, pace and threshold alerts | `AI-Usage-Tracker-Setup-<version>.exe` | [docs/desktop](docs/desktop/README.md) |
+| **Android 8+** | Home-screen widget and a small app to sign in and pick plans | `AI-Usage-Tracker-<version>.apk` | [docs/android](docs/android/README.md) |
 
-One line per limit: its name, when it resets, and how much you've used, with a thin bar under it. Bars turn
-orange at 70% and red at 90%.
+Both come from the same [release](https://github.com/Pengopal/ai-usage-tracker-widget/releases/latest), update
+themselves from it, and look the same: one line per limit with its reset time and percentage, and a bar that
+turns orange at 70% and red at 90%.
 
-| Detailed | Compact rings |
+| Windows | Android |
 | :---: | :---: |
-| <img src="docs/images/bars.png" alt="Bar view" width="320"> | <img src="docs/images/rings.png" alt="Ring view" width="400"> |
+| <img src="docs/desktop/images/bars.png" alt="Windows widget" width="300"> | <img src="docs/android/images/widget.png" alt="Android home-screen widget" width="420"> |
 
-### Warnings before you run out
-
-- **Pace heads-up**: from your last hour of use, the widget works out when a limit will run out. If that's
-  before it resets, you get a notification about 30 minutes ahead.
-- **Threshold alerts** at the percentages you choose (75, 90 and 100% by default), once per reset window.
-- **Limit-back alert** when a limit you'd nearly used up resets.
-
-### Your plan, your providers
-
-<img src="docs/images/settings.png" alt="Settings: providers, plans and alerts" width="320" align="right">
-
-Each provider has a switch to show or hide it and a plan picker. **Auto-detect** shows every limit your account
-reports and labels the plan it finds. Picking a plan shows only that plan's limits — for example, Claude
-**Max 20x** shows just the weekly limit. Drag a provider by its handle (or focus the handle and use the arrow
-keys) to set the order the widget lists them in.
-
-| Provider | Limits shown | Plans |
-| --- | --- | --- |
-| Claude | 5-hour, weekly | Free, Pro, Max 5x, Max 20x, Team, Enterprise |
-| ChatGPT | 5-hour, weekly | Free, Plus, Pro, Business, Enterprise |
-| Grok | Weekly pool | Free, SuperGrok, SuperGrok Heavy, X Premium, X Premium+ |
-
-### Stays out of the way
-
-Frameless and draggable, sizes itself to its content, remembers where you put it, and lives in the tray. It
-updates itself from GitHub Releases and shows an **Update** button when a new version is ready.
-
-<br clear="right">
-
-## Install
-
-1. Download `AI-Usage-Tracker-Setup-<version>.exe` from the
-   [latest release](https://github.com/Pengopal/ai-usage-tracker-widget/releases/latest) and run it.
-2. Click **Sign in** next to each provider you use.
-
-Until the installer is code-signed, Windows SmartScreen shows "Windows protected your PC" the first time:
-click **More info → Run anyway**. [docs/CODE-SIGNING.md](docs/CODE-SIGNING.md) explains why and how signing
-is set up.
-
-The portable `AI-Usage-Tracker-Portable-<version>.exe` runs without installing but can't update itself.
-
-To start with Windows: `Win + R` → `shell:startup` → put a shortcut to the app there.
-
-## Signing in
-
-**Sign in** opens the provider's real login page in a window. Sign in as usual; the window closes by itself
-once the app can read your usage, and the widget comes back to the front. You do this once per account.
-
-Your password goes only to Anthropic, OpenAI or xAI. The app keeps the sites' normal login cookies in its own
-private profile, like a browser does, and **Sign out** deletes them. If "Continue with Google" is blocked in the
-sign-in window, use email sign-in.
-
-<img src="docs/images/signed-out.png" alt="Widget before signing in" width="320">
+Each device signs in on its own; nothing is synced between them.
 
 ## How it reads your usage
 
-None of these services offers a public API for personal usage, so the widget reads the same endpoints their
-own websites use, from a hidden window signed in as you:
+None of these services offers a public API for personal usage, so the app reads the same endpoints their own
+websites use, from inside the provider's own page, signed in as you. Your password and session never leave
+that page.
 
 | Provider | Endpoint | Gives |
 | --- | --- | --- |
-| Claude | `claude.ai/api/organizations/{org}/usage` (behind Settings → Usage) | 5-hour and weekly %, resets, plan tier |
+| Claude | `claude.ai/api/organizations/{org}/usage` | 5-hour and weekly %, resets, plan tier |
 | ChatGPT | `chatgpt.com/backend-api/wham/usage` | 5-hour and weekly %, resets, plan |
 | Grok | `grok.com/rest/grok/credits` (falls back to `/rest/rate-limits`) | Weekly pool %, reset |
 
-These are unofficial and can change without notice. When one does, the widget shows "Sync problem" until
-it's updated, and the last raw response is saved as `sync-debug-<provider>.json` in the data folder to make the
-fix quick.
+These are unofficial and can change without notice; when one does, the app shows "Sync problem" until it's
+updated. **Gemini isn't supported**: Google blocks sign-in inside embedded windows.
 
-**Gemini isn't supported.** Google blocks sign-in inside embedded app windows, and the Gemini app doesn't
-expose your usage anywhere the widget could read it.
-
-## Data and privacy
-
-Everything stays on your PC, in `%APPDATA%\ai-usage-tracker-widget\`:
-
-| File | Holds |
-| --- | --- |
-| `usage-data.json` | Last readings and settings |
-| `history.json` | Seven days of readings, for the pace heads-up |
-| `sync-debug-*.json` | The last raw usage response per provider |
-| `Partitions\` | The login sessions |
-
-The app talks only to the three providers and to GitHub (for updates). Delete the folder to reset everything.
-
-## Develop
-
-Requires [Node.js](https://nodejs.org/) 22.
-
-```bash
-npm install
-```
-
-```bash
-npm start
-```
-
-```bash
-npm test
-```
-
-Build the installer and portable exe into `dist/`:
-
-```bash
-npm run build
-```
+## Repository layout
 
 | Path | What lives there |
 | --- | --- |
-| `src/main.js` | Window, tray, sync loop, alerts, IPC |
-| `src/sync.js` | Sign-in windows and the per-provider usage readers |
-| `src/parsers.js` | Turns each provider's response into the common shape |
-| `src/providers.js` | Providers, plans, and which limits each plan shows |
-| `src/insights.js` | Burn-rate pace from history |
-| `src/store.js` | Readings, settings and history on disk |
-| `src/updater.js` | Updates from GitHub Releases |
-| `src/renderer/` | The widget UI |
-| `test/` | Unit tests (`node --test`) |
+| [`core/`](core) | Shared by every platform: the provider catalog, the in-page readers, parsers, row-building and tests |
+| [`desktop/`](desktop) | The Windows app (Electron) |
+| [`android/`](android) | The Android app and widget (Kotlin, Jetpack Glance) |
+| [`docs/`](docs) | Per-platform guides, [architecture](docs/ARCHITECTURE.md) and design notes |
 
-See [CONTRIBUTING.md](CONTRIBUTING.md) before opening a pull request.
+Each platform copies `core/src` in at build time, so a fix to a reader or the catalog reaches both.
+[docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) explains how the pieces fit; [CONTRIBUTING.md](CONTRIBUTING.md)
+covers running each one.
 
 ## Releasing
 
+Every platform ships from one tag and one GitHub release.
+
 1. Add the changes under a new version heading in [CHANGELOG.md](CHANGELOG.md).
-2. Set the same `version` in `package.json`, merge to `main`.
+2. Set the same version in `desktop/package.json` and `android/gradle.properties` (`appVersion`), merge to
+   `main`.
 3. Tag it and push the tag:
 
 ```bash
-git tag v1.2.0
+git tag v1.3.0
 ```
 
 ```bash
-git push origin v1.2.0
+git push origin v1.3.0
 ```
 
-The [Release workflow](.github/workflows/release.yml) builds the installer on Windows, publishes it with the
-changelog section as release notes, and installed apps pick it up within a few hours.
+The [Release workflow](.github/workflows/release.yml) checks both versions match the tag, builds and publishes
+the Windows installer, then builds the signed APK and attaches it to the same release. The APK needs the
+signing secrets in [docs/android](docs/android/README.md#release-signing); without them the release is
+Windows-only.
 
 ## Security
 

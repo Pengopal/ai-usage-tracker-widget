@@ -1,0 +1,154 @@
+{
+  "claude": {
+    "name": "Claude",
+    "logo": "i-claude",
+    "url": "https://claude.ai/settings/usage",
+    "home": "https://claude.ai/settings/usage",
+    "loginUrl": "https://claude.ai/login",
+    "metrics": {
+      "session": "5-hour",
+      "weekly": "Weekly"
+    },
+    "plans": {
+      "free": {
+        "label": "Free",
+        "metrics": [
+          "session",
+          "weekly"
+        ]
+      },
+      "pro": {
+        "label": "Pro",
+        "metrics": [
+          "session",
+          "weekly"
+        ]
+      },
+      "max": {
+        "label": "Max",
+        "metrics": [
+          "session",
+          "weekly"
+        ],
+        "hidden": true
+      },
+      "max5": {
+        "label": "Max 5x",
+        "metrics": [
+          "session",
+          "weekly"
+        ]
+      },
+      "max20": {
+        "label": "Max 20x",
+        "metrics": [
+          "weekly"
+        ]
+      },
+      "team": {
+        "label": "Team",
+        "metrics": [
+          "session",
+          "weekly"
+        ]
+      },
+      "enterprise": {
+        "label": "Enterprise",
+        "metrics": [
+          "session",
+          "weekly"
+        ]
+      }
+    }
+  },
+  "openai": {
+    "name": "ChatGPT",
+    "logo": "i-openai",
+    "url": "https://chatgpt.com/",
+    "home": "https://chatgpt.com/",
+    "loginUrl": "https://chatgpt.com/auth/login",
+    "metrics": {
+      "session": "5-hour",
+      "weekly": "Weekly"
+    },
+    "plans": {
+      "free": {
+        "label": "Free",
+        "metrics": [
+          "session",
+          "weekly"
+        ]
+      },
+      "plus": {
+        "label": "Plus",
+        "metrics": [
+          "session",
+          "weekly"
+        ]
+      },
+      "pro": {
+        "label": "Pro",
+        "metrics": [
+          "session",
+          "weekly"
+        ]
+      },
+      "business": {
+        "label": "Business",
+        "metrics": [
+          "session",
+          "weekly"
+        ]
+      },
+      "enterprise": {
+        "label": "Enterprise",
+        "metrics": [
+          "session",
+          "weekly"
+        ]
+      }
+    }
+  },
+  "grok": {
+    "name": "Grok",
+    "logo": "i-xai",
+    "url": "https://grok.com/",
+    "home": "https://grok.com/?_s=usage",
+    "loginUrl": "https://grok.com/sign-in",
+    "metrics": {
+      "weekly": "Weekly"
+    },
+    "plans": {
+      "free": {
+        "label": "Free",
+        "metrics": [
+          "weekly"
+        ]
+      },
+      "supergrok": {
+        "label": "SuperGrok",
+        "metrics": [
+          "weekly"
+        ]
+      },
+      "heavy": {
+        "label": "SuperGrok Heavy",
+        "metrics": [
+          "weekly"
+        ]
+      },
+      "xpremium": {
+        "label": "X Premium",
+        "metrics": [
+          "weekly"
+        ]
+      },
+      "xpremiumplus": {
+        "label": "X Premium+",
+        "metrics": [
+          "weekly"
+        ]
+      }
+    }
+  }
+}

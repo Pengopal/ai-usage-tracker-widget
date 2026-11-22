@@ -1,0 +1,5 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">AI Usage</string>
+    <string name="widget_description">Your Claude, ChatGPT and Grok limits at a glance</string>
+</resources>
