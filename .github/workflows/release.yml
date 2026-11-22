@@ -115,7 +115,7 @@ jobs:
         with:
           distribution: temurin
           java-version: 21
-      - uses: gradle/actions/setup-gradle@v4
+      - uses: gradle/actions/setup-gradle@v6
         if: steps.key.outputs.ok == 'true'
       - name: Build the signed APK
         if: steps.key.outputs.ok == 'true'

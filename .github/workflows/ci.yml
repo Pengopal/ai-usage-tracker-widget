@@ -48,7 +48,7 @@ jobs:
         with:
           distribution: temurin
           java-version: 21
-      - uses: gradle/actions/setup-gradle@v4
+      - uses: gradle/actions/setup-gradle@v6
       - run: ./gradlew --no-daemon testGithubDebugUnitTest assembleGithubDebug assemblePlayDebug
 
   # The branch ruleset requires a check named "test": it passes only when every platform does.
