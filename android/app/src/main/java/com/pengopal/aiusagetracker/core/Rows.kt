@@ -19,7 +19,7 @@ data class EffectivePlan(val key: String, val label: String?, val metrics: List<
 
 fun effectivePlan(provider: Provider, service: ServiceState?, chosen: String?): EffectivePlan {
     val plan = chosen?.takeIf { it != "auto" }?.let { provider.plans[it] }
-    if (plan != null) return EffectivePlan(chosen!!, plan.label, plan.metrics)
+    if (plan != null) return EffectivePlan(chosen, plan.label, plan.metrics)
     val detected = service?.plan?.let { provider.plans[it] }
     return EffectivePlan("auto", detected?.label, provider.metrics.keys.toList())
 }
