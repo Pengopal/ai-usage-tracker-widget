@@ -1,0 +1,155 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self'">
+  <title>AI Usage Tracker</title>
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body data-view="bars">
+  <svg class="sprite" width="0" height="0" aria-hidden="true">
+    <symbol id="i-claude" viewBox="0 0 24 24"><path fill-rule="evenodd" d="M4.709 15.955l4.72-2.647.08-.23-.08-.128H9.2l-.79-.048-2.698-.073-2.339-.097-2.266-.122-.571-.121L0 11.784l.055-.352.48-.321.686.06 1.52.103 2.278.158 1.652.097 2.449.255h.389l.055-.157-.134-.098-.103-.097-2.358-1.596-2.552-1.688-1.336-.972-.724-.491-.364-.462-.158-1.008.656-.722.881.06.225.061.893.686 1.908 1.476 2.491 1.833.365.304.145-.103.019-.073-.164-.274-1.355-2.446-1.446-2.49-.644-1.032-.17-.619a2.970 2.970 0 01-.104-.729L6.283.134 6.696 0l.996.134.42.364.62 1.414 1.002 2.229 1.555 3.03.456.898.243.832.091.255h.158V9.010l.128-1.706.237-2.095.23-2.695.08-.76.376-.91.747-.492.584.28.48.685-.067.444-.286 1.851-.559 2.903-.364 1.942h.212l.243-.242.985-1.306 1.652-2.064.73-.82.85-.904.547-.431h1.033l.76 1.129-.34 1.166-1.064 1.347-.881 1.142-1.264 1.7-.79 1.36.073.11.188-.02 2.856-.606 1.543-.28 1.841-.315.833.388.091.395-.328.807-1.969.486-2.309.462-3.439.813-.042.03.049.061 1.549.146.662.036h1.622l3.020.225.79.522.474.638-.079.485-1.215.62-1.64-.389-3.829-.91-1.312-.329h-.182v.11l1.093 1.068 2.006 1.810 2.509 2.330.127.578-.322.455-.34-.049-2.205-1.657-.851-.747-1.926-1.620h-.128v.17l.444.649 2.345 3.521.122 1.080-.17.353-.608.213-.668-.122-1.374-1.925-1.415-2.167-1.143-1.943-.14.08-.674 7.254-.316.37-.729.28-.607-.461-.322-.747.322-1.476.389-1.924.315-1.530.286-1.900.17-.632-.012-.042-.14.018-1.434 1.967-2.180 2.945-1.726 1.845-.414.164-.717-.37.067-.662.401-.589 2.388-3.036 1.440-1.882.930-1.086-.006-.158h-.055L4.132 18.560l-1.130.146-.487-.456.061-.746.231-.243 1.908-1.312-.006.006z"/></symbol>
+    <symbol id="i-xai" viewBox="0 0 24 24"><path fill-rule="evenodd" d="M6.469 8.776L16.512 23h-4.464L2.005 8.776H6.47zm-.004 7.9l2.233 3.164L6.467 23H2l4.465-6.324zM22 2.582V23h-3.659V7.764L22 2.582zM22 1l-9.952 14.095-2.233-3.163L17.533 1H22z"/></symbol>
+    <symbol id="i-sync" viewBox="0 0 16 16"><path d="M13.6 7.2A5.6 5.6 0 0 0 3.4 4.6V2.8H2v4.4h4.4V5.8H4.3a4.2 4.2 0 0 1 7.9 1.4zM2.4 8.8a5.6 5.6 0 0 0 10.2 2.6v1.8H14V8.8H9.6v1.4h2.1a4.2 4.2 0 0 1-7.9-1.4z"/></symbol>
+    <symbol id="i-rings" viewBox="0 0 16 16"><path d="M4 5.5a2.5 2.5 0 1 1 0 5 2.5 2.5 0 0 1 0-5zm0 1.2a1.3 1.3 0 1 0 0 2.6 1.3 1.3 0 0 0 0-2.6zm8-1.2a2.5 2.5 0 1 1 0 5 2.5 2.5 0 0 1 0-5zm0 1.2a1.3 1.3 0 1 0 0 2.6 1.3 1.3 0 0 0 0-2.6z"/></symbol>
+    <symbol id="i-bars" viewBox="0 0 16 16"><path d="M2 4h12v1.6H2zm0 3.2h8v1.6H2zm0 3.2h10V12H2z"/></symbol>
+    <symbol id="i-gear" viewBox="0 0 16 16"><path d="M9.2 1l.4 1.8c.4.1.8.3 1.1.5l1.6-.9 1.7 1.7-.9 1.6c.2.3.4.7.5 1.1L15 7.2v2.4l-1.8.4c-.1.4-.3.8-.5 1.1l.9 1.6-1.7 1.7-1.6-.9c-.3.2-.7.4-1.1.5L9.2 15H6.8l-.4-1.8c-.4-.1-.8-.3-1.1-.5l-1.6.9L2 11.9l.9-1.6c-.2-.3-.4-.7-.5-1.1L.6 8.8V6.4l1.8-.4c.1-.4.3-.8.5-1.1L2 3.3 3.7 1.6l1.6.9c.3-.2.7-.4 1.1-.5L6.8 1h2.4zM8 5.4a2.6 2.6 0 1 0 0 5.2 2.6 2.6 0 0 0 0-5.2z"/></symbol>
+    <symbol id="i-pin" viewBox="0 0 16 16"><path d="M9.8 1.5l4.7 4.7-1.4.4-2.6 2.6.3 3.1-1.1 1.1-2.7-2.7-3.6 3.6-.9-.9 3.6-3.6L3.4 7.1l1.1-1.1 3.1.3 2.6-2.6z"/></symbol>
+    <symbol id="i-close" viewBox="0 0 16 16"><path d="M4.2 3.2L8 7l3.8-3.8 1 1L9 8l3.8 3.8-1 1L8 9l-3.8 3.8-1-1L7 8 3.2 4.2z"/></symbol>
+    <symbol id="i-out" viewBox="0 0 16 16"><path d="M9 2h5v5h-1.5V4.6L7.6 9.5 6.5 8.4l4.9-4.9H9zM3 4h4v1.5H4.5v6h6V9H12v4H3z"/></symbol>
+  </svg>
+
+  <header class="titlebar">
+    <div class="title">
+      <span class="status-dot" id="status-dot"></span>
+      <span class="title-text" id="title-text">Usage</span>
+      <span class="updated" id="updated"></span>
+      <button class="pill hidden" id="btn-update" title="A new version is ready">Update</button>
+    </div>
+    <div class="controls">
+      <button class="icon-btn" id="btn-sync" title="Sync now"><svg><use href="#i-sync"/></svg></button>
+      <button class="icon-btn widget-only" id="btn-view" title="Compact ring view"><svg><use href="#i-rings"/></svg></button>
+      <button class="icon-btn widget-only" id="btn-settings" title="Settings"><svg><use href="#i-gear"/></svg></button>
+      <button class="icon-btn widget-only bars-only" id="btn-pin" title="Always on top" aria-pressed="true"><svg><use href="#i-pin"/></svg></button>
+      <button class="icon-btn close" id="btn-close" title="Close (Esc in settings)"><svg><use href="#i-close"/></svg></button>
+    </div>
+  </header>
+
+  <!-- Bars view -->
+  <main id="bars" class="view">
+    <div class="inner">
+      <section class="provider" id="p-claude">
+        <div class="provider-head">
+          <svg class="logo logo-claude"><use href="#i-claude"/></svg>
+          <span class="provider-name">Claude</span>
+          <span class="plan" id="claude-plan"></span>
+          <button class="ghost-icon" data-open="claude" title="Open claude.ai usage"><svg><use href="#i-out"/></svg></button>
+        </div>
+        <div class="connected">
+          <div class="meter" data-metric="claude.session">
+            <div class="meter-row"><span class="label">Session</span><svg class="spark" viewBox="0 0 48 14" preserveAspectRatio="none"><polyline/></svg><span class="pct"></span></div>
+            <div class="bar"><div class="fill"></div></div>
+            <div class="meta"><span class="reset"></span><span class="pace"></span></div>
+          </div>
+          <div class="meter" data-metric="claude.weekly">
+            <div class="meter-row"><span class="label">Weekly</span><svg class="spark" viewBox="0 0 48 14" preserveAspectRatio="none"><polyline/></svg><span class="pct"></span></div>
+            <div class="bar"><div class="fill"></div></div>
+            <div class="meta"><span class="reset"></span><span class="pace"></span></div>
+          </div>
+        </div>
+        <div class="disconnected"><span>Not connected</span><button class="link" data-signin="claude">Sign in</button></div>
+        <p class="card-error" id="claude-error"></p>
+      </section>
+
+      <section class="provider" id="p-grok">
+        <div class="provider-head">
+          <svg class="logo logo-xai"><use href="#i-xai"/></svg>
+          <span class="provider-name">Grok</span>
+          <button class="ghost-icon" data-open="grok" title="Open grok.com"><svg><use href="#i-out"/></svg></button>
+        </div>
+        <div class="connected">
+          <div class="meter" data-metric="grok">
+            <div class="meter-row"><span class="label" id="grok-label">Weekly</span><svg class="spark" viewBox="0 0 48 14" preserveAspectRatio="none"><polyline/></svg><span class="pct"></span></div>
+            <div class="bar"><div class="fill"></div></div>
+            <div class="meta"><span class="reset"></span><span class="pace"></span></div>
+          </div>
+        </div>
+        <div class="disconnected"><span>Not connected</span><button class="link" data-signin="grok">Sign in</button></div>
+        <p class="card-error" id="grok-error"></p>
+      </section>
+    </div>
+  </main>
+
+  <!-- Compact ring view -->
+  <main id="rings" class="view hidden">
+    <div class="inner ring-row">
+      <div class="ring" data-metric="claude.session" data-service="claude">
+        <svg viewBox="0 0 44 44"><circle class="track" cx="22" cy="22" r="18"/><circle class="arc" cx="22" cy="22" r="18"/></svg>
+        <span class="ring-pct"></span>
+        <span class="ring-label"><svg class="mini-logo logo-claude"><use href="#i-claude"/></svg>Session</span>
+        <span class="ring-sub"></span>
+      </div>
+      <div class="ring" data-metric="claude.weekly" data-service="claude">
+        <svg viewBox="0 0 44 44"><circle class="track" cx="22" cy="22" r="18"/><circle class="arc" cx="22" cy="22" r="18"/></svg>
+        <span class="ring-pct"></span>
+        <span class="ring-label"><svg class="mini-logo logo-claude"><use href="#i-claude"/></svg>Weekly</span>
+        <span class="ring-sub"></span>
+      </div>
+      <div class="ring" data-metric="grok" data-service="grok">
+        <svg viewBox="0 0 44 44"><circle class="track" cx="22" cy="22" r="18"/><circle class="arc" cx="22" cy="22" r="18"/></svg>
+        <span class="ring-pct"></span>
+        <span class="ring-label"><svg class="mini-logo logo-xai"><use href="#i-xai"/></svg>Grok</span>
+        <span class="ring-sub"></span>
+      </div>
+    </div>
+  </main>
+
+  <!-- Settings -->
+  <form id="settings" class="view hidden" autocomplete="off">
+    <div class="inner">
+      <h3>Accounts</h3>
+      <div class="account" data-account="claude">
+        <div class="account-row">
+          <svg class="logo logo-claude"><use href="#i-claude"/></svg>
+          <div class="account-text">
+            <div class="account-name">Claude</div>
+            <div class="account-status"></div>
+          </div>
+          <button type="button" class="btn small account-btn"></button>
+        </div>
+      </div>
+      <div class="account" data-account="grok">
+        <div class="account-row">
+          <svg class="logo logo-xai"><use href="#i-xai"/></svg>
+          <div class="account-text">
+            <div class="account-name">Grok</div>
+            <div class="account-status"></div>
+          </div>
+          <button type="button" class="btn small account-btn"></button>
+        </div>
+      </div>
+      <p class="hint">Sign in opens the real Claude or Grok login. It closes by itself once you're in, and the widget picks up your usage. If Google sign-in is blocked there, use email sign-in.</p>
+
+      <h3>Alerts</h3>
+      <label class="switch-row"><span>Notifications</span><input type="checkbox" id="set-notify"><i></i></label>
+      <label class="field-row"><span>Alert at</span><span class="with-unit"><input type="text" id="set-thresholds" inputmode="numeric"><em>%</em></span></label>
+      <label class="switch-row"><span>Heads-up 30 min before a limit<small>Based on your recent pace</small></span><input type="checkbox" id="set-pace"><i></i></label>
+      <label class="switch-row"><span>Tell me when a limit is back</span><input type="checkbox" id="set-back"><i></i></label>
+
+      <h3>Window</h3>
+      <label class="switch-row"><span>Compact ring view</span><input type="checkbox" id="set-rings"><i></i></label>
+      <label class="switch-row"><span>Always on top</span><input type="checkbox" id="set-ontop"><i></i></label>
+      <label class="switch-row"><span>Close button hides to tray</span><input type="checkbox" id="set-tray"><i></i></label>
+      <label class="field-row"><span>Grok model</span><input type="text" id="set-grok-model" placeholder="Default"></label>
+
+      <h3>About</h3>
+      <div class="about-row">
+        <span><span id="about-version"></span><small id="about-update"></small></span>
+        <button type="button" class="btn small" id="btn-update-action">Check for updates</button>
+      </div>
+    </div>
+  </form>
+
+  <script src="app.js"></script>
+</body>
+</html>
