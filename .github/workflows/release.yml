@@ -1,0 +1,71 @@
+name: Release
+# Push a tag like v1.2.0 (matching package.json) to build the Windows installer
+# and publish it as a GitHub release. Installed apps update from that release.
+on:
+  push:
+    tags: ['v*']
+
+permissions:
+  contents: write
+
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  release:
+    runs-on: windows-latest
+    env:
+      GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      # Optional code signing (see docs/CODE-SIGNING.md). Builds stay unsigned
+      # until these secrets and variables exist.
+      AZURE_TENANT_ID: ${{ secrets.AZURE_TENANT_ID }}
+      AZURE_CLIENT_ID: ${{ secrets.AZURE_CLIENT_ID }}
+      AZURE_CLIENT_SECRET: ${{ secrets.AZURE_CLIENT_SECRET }}
+      SIGN_ENDPOINT: ${{ vars.AZURE_SIGNING_ENDPOINT }}
+      SIGN_ACCOUNT: ${{ vars.AZURE_SIGNING_ACCOUNT }}
+      SIGN_PROFILE: ${{ vars.AZURE_SIGNING_PROFILE }}
+      SIGN_PUBLISHER: ${{ vars.AZURE_SIGNING_PUBLISHER }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npm test
+
+      - name: Check the tag matches package.json
+        shell: bash
+        run: |
+          version="v$(node -p "require('./package.json').version")"
+          test "$version" = "$GITHUB_REF_NAME" || { echo "::error::Tag $GITHUB_REF_NAME does not match package.json $version"; exit 1; }
+
+      - name: Build and publish
+        shell: bash
+        run: |
+          args=(--win --publish always)
+          if [ -n "$AZURE_CLIENT_ID" ] && [ -n "$SIGN_ENDPOINT" ]; then
+            echo "Signing with Azure Artifact Signing"
+            args+=(
+              "-c.win.azureSignOptions.endpoint=$SIGN_ENDPOINT"
+              "-c.win.azureSignOptions.codeSigningAccountName=$SIGN_ACCOUNT"
+              "-c.win.azureSignOptions.certificateProfileName=$SIGN_PROFILE"
+              "-c.win.azureSignOptions.publisherName=$SIGN_PUBLISHER"
+            )
+          else
+            echo "::warning::No signing secrets set; the installer will be unsigned"
+          fi
+          npx electron-builder "${args[@]}"
+
+      - name: Release notes from CHANGELOG.md
+        shell: bash
+        run: |
+          version="${GITHUB_REF_NAME#v}"
+          awk -v v="$version" '
+            $0 ~ "^## \\[" v "\\]" { on = 1; next }
+            on && /^## \[/ { exit }
+            on { print }
+          ' CHANGELOG.md > notes.md
+          test -s notes.md || { echo "::error::CHANGELOG.md has no section for $version"; exit 1; }
+          gh release edit "$GITHUB_REF_NAME" --title "$GITHUB_REF_NAME" --notes-file notes.md

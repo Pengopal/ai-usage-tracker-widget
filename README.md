@@ -1,61 +1,132 @@
-# AI Usage Tracker Widget
+<div align="center">
 
-A compact, always-on-top Windows widget that shows your **real** Claude and Grok usage limits, read
-from your own accounts every minute, with alerts before you run out.
+<img src="docs/images/bars.png" alt="AI Usage Tracker widget showing Claude, ChatGPT and Grok limits" width="320">
+
+# AI Usage Tracker
+
+**Your Claude, ChatGPT and Grok limits, live on your desktop — with a heads-up before you run out.**
+
+[![Release](https://img.shields.io/github/v/release/Pengopal/ai-usage-tracker-widget?color=6aa8ff)](https://github.com/Pengopal/ai-usage-tracker-widget/releases/latest)
+[![CI](https://github.com/Pengopal/ai-usage-tracker-widget/actions/workflows/ci.yml/badge.svg)](https://github.com/Pengopal/ai-usage-tracker-widget/actions/workflows/ci.yml)
+[![License: MIT](https://img.shields.io/badge/License-MIT-5fae84.svg)](LICENSE)
+
+<sub><b>Built with</b></sub><br>
+[![Electron](https://img.shields.io/badge/Electron-2b2e3a?logo=electron&logoColor=9feaf9)](https://www.electronjs.org)
+[![Node.js](https://img.shields.io/badge/Node.js-5fa04e?logo=nodedotjs&logoColor=white)](https://nodejs.org)
+[![JavaScript](https://img.shields.io/badge/JavaScript-f7df1e?logo=javascript&logoColor=black)](https://developer.mozilla.org/docs/Web/JavaScript)
+[![electron-builder](https://img.shields.io/badge/electron--builder-1a1a1a)](https://www.electron.build)
+[![Windows](https://img.shields.io/badge/Windows_10%2F11-0078d4?logo=windows&logoColor=white)](https://www.microsoft.com/windows)
+
+**[Download for Windows](https://github.com/Pengopal/ai-usage-tracker-widget/releases/latest)**
+
+</div>
+
+## The problem
+
+Claude, ChatGPT and Grok all ration usage in windows — five hours, a week — and each hides its meter on a
+different settings page. You find out you're out when a reply stops halfway.
+
+AI Usage Tracker keeps every limit in one small, always-on-top window, refreshed every minute, and warns you
+while there's still time to slow down.
 
 ## Features
 
-- **Live usage**: Claude 5-hour session and weekly limits (with plan), and Grok's weekly pool, synced every
-  minute with exact reset countdowns.
-- **Two layouts**: a detailed bar view, or a compact ring strip (⚪ button in the title bar, or the tray menu).
-- **Pace heads-up**: from your recent burn rate, shows "Out in ~1h 5m" when a limit will run out before it
-  resets, and notifies you about 30 minutes ahead.
-- **Threshold alerts**: Windows notifications at the percentages you choose (default 75, 90, 100%), once per
-  reset window.
-- **Limit-back alert**: tells you when a limit you'd nearly used up has reset.
-- **24-hour sparklines**: readings are stored locally (7 days) and drawn next to each limit.
-- **Automatic updates**: the installed app checks GitHub Releases, downloads new versions in the background,
-  and shows an **Update** button to restart into them.
-- Frameless, draggable, sizes itself to its content, remembers its position, lives in the tray.
+### Every limit at a glance
 
-## Connecting accounts
+One line per limit: how much you've used, when it resets, and a 24-hour trend line. Bars turn orange at 70%
+and red at 90%.
 
-Click **Sign in** on the widget (or in ⚙ Settings). The real claude.ai or grok.com login opens in a window;
-sign in as usual. The window closes by itself once the app can read your usage, and the widget comes back
-to the front with your numbers. You only do this once per account.
+| Detailed | Compact rings |
+| :---: | :---: |
+| <img src="docs/images/bars.png" alt="Bar view" width="320"> | <img src="docs/images/rings.png" alt="Ring view" width="400"> |
 
-Your password goes only to Claude or xAI. The app keeps the sites' normal login cookies in its own private
-profile (like a browser does) and uses them to read your usage. **Sign out** in Settings deletes them.
+### Warnings before you run out
 
-If "Continue with Google" is blocked inside the sign-in window, use email sign-in.
+- **Pace heads-up**: from your last hour of use, the widget works out when a limit will run out. If that's
+  before it resets, you see "Out in ~1h 8m" and get a notification about 30 minutes ahead.
+- **Threshold alerts** at the percentages you choose (75, 90 and 100% by default), once per reset window.
+- **Limit-back alert** when a limit you'd nearly used up resets.
 
-### How syncing works
+### Your plan, your providers
 
-Neither Claude nor xAI offers a public API for personal usage, so the widget reads the same internal
-endpoints their own websites use:
+<img src="docs/images/settings.png" alt="Settings: providers, plans and alerts" width="320" align="right">
 
-| Service | Endpoint read | Shows |
-| ------- | ------------- | ----- |
-| Claude  | `claude.ai/api/organizations/{org}/usage` (the data behind Settings → Usage) | 5-hour session %, weekly %, reset times, plan |
-| Grok    | `GET grok.com/rest/grok/credits` (falls back to `POST /rest/rate-limits`) | Used % of the weekly pool and its reset |
+Each provider has a switch to show or hide it and a plan picker. **Auto-detect** shows every limit your account
+reports and labels the plan it finds. Picking a plan shows only that plan's limits — for example, Claude
+**Max 20x** shows just the weekly limit.
 
-These are unofficial endpoints. If Anthropic or xAI change them, the widget shows a "Sync problem" line until
-it's updated. The raw last response is saved as `sync-debug-claude.json` / `sync-debug-grok.json` next to the
-data file to make fixing that quick. Grok usage inside the X app may be counted separately from grok.com.
+| Provider | Limits shown | Plans |
+| --- | --- | --- |
+| Claude | 5-hour, weekly | Free, Pro, Max 5x, Max 20x, Team, Enterprise |
+| ChatGPT | 5-hour, weekly | Free, Plus, Pro, Business, Enterprise |
+| Grok | Weekly pool | Free, SuperGrok, SuperGrok Heavy, X Premium, X Premium+ |
+
+### Stays out of the way
+
+Frameless and draggable, sizes itself to its content, remembers where you put it, and lives in the tray. It
+updates itself from GitHub Releases and shows an **Update** button when a new version is ready.
+
+<br clear="right">
 
 ## Install
 
-Download `AI-Usage-Tracker-Setup-<version>.exe` from
-[Releases](https://github.com/Pengopal/ai-usage-tracker-widget/releases) and run it. Builds aren't
-code-signed, so SmartScreen asks first: **More info → Run anyway**.
+1. Download `AI-Usage-Tracker-Setup-<version>.exe` from the
+   [latest release](https://github.com/Pengopal/ai-usage-tracker-widget/releases/latest) and run it.
+2. Click **Sign in** next to each provider you use.
 
-The portable `AI-Usage-Tracker-Portable-<version>.exe` needs no install but can't update itself.
+Until the installer is code-signed, Windows SmartScreen shows "Windows protected your PC" the first time:
+click **More info → Run anyway**. [docs/CODE-SIGNING.md](docs/CODE-SIGNING.md) explains why and how signing
+is set up.
 
-To start with Windows: `Win + R` → `shell:startup` → drop a shortcut to the app there.
+The portable `AI-Usage-Tracker-Portable-<version>.exe` runs without installing but can't update itself.
+
+To start with Windows: `Win + R` → `shell:startup` → put a shortcut to the app there.
+
+## Signing in
+
+**Sign in** opens the provider's real login page in a window. Sign in as usual; the window closes by itself
+once the app can read your usage, and the widget comes back to the front. You do this once per account.
+
+Your password goes only to Anthropic, OpenAI or xAI. The app keeps the sites' normal login cookies in its own
+private profile, like a browser does, and **Sign out** deletes them. If "Continue with Google" is blocked in the
+sign-in window, use email sign-in.
+
+<img src="docs/images/signed-out.png" alt="Widget before signing in" width="320">
+
+## How it reads your usage
+
+None of these services offers a public API for personal usage, so the widget reads the same endpoints their
+own websites use, from a hidden window signed in as you:
+
+| Provider | Endpoint | Gives |
+| --- | --- | --- |
+| Claude | `claude.ai/api/organizations/{org}/usage` (behind Settings → Usage) | 5-hour and weekly %, resets, plan tier |
+| ChatGPT | `chatgpt.com/backend-api/wham/usage` | 5-hour and weekly %, resets, plan |
+| Grok | `grok.com/rest/grok/credits` (falls back to `/rest/rate-limits`) | Weekly pool %, reset |
+
+These are unofficial and can change without notice. When one does, the widget shows "Sync problem" until
+it's updated, and the last raw response is saved as `sync-debug-<provider>.json` in the data folder to make the
+fix quick.
+
+**Gemini isn't supported.** Google blocks sign-in inside embedded app windows, and the Gemini app doesn't
+expose your usage anywhere the widget could read it.
+
+## Data and privacy
+
+Everything stays on your PC, in `%APPDATA%\ai-usage-tracker-widget\`:
+
+| File | Holds |
+| --- | --- |
+| `usage-data.json` | Last readings and settings |
+| `history.json` | Seven days of readings, for pace and trend lines |
+| `sync-debug-*.json` | The last raw usage response per provider |
+| `Partitions\` | The login sessions |
+
+The app talks only to the three providers and to GitHub (for updates). Delete the folder to reset everything.
 
 ## Develop
 
-Requires [Node.js](https://nodejs.org/) 18+.
+Requires [Node.js](https://nodejs.org/) 22.
 
 ```bash
 npm install
@@ -65,42 +136,51 @@ npm install
 npm start
 ```
 
+```bash
+npm test
+```
+
 Build the installer and portable exe into `dist/`:
 
 ```bash
 npm run build
 ```
 
-### Releasing an update
+| Path | What lives there |
+| --- | --- |
+| `src/main.js` | Window, tray, sync loop, alerts, IPC |
+| `src/sync.js` | Sign-in windows and the per-provider usage readers |
+| `src/parsers.js` | Turns each provider's response into the common shape |
+| `src/providers.js` | Providers, plans, and which limits each plan shows |
+| `src/insights.js` | Burn-rate pace and trend lines from history |
+| `src/store.js` | Readings, settings and history on disk |
+| `src/updater.js` | Updates from GitHub Releases |
+| `src/renderer/` | The widget UI |
+| `test/` | Unit tests (`node --test`) |
 
-1. Bump `version` in `package.json`.
-2. Publish to GitHub Releases (needs a token with access to the repo):
+See [CONTRIBUTING.md](CONTRIBUTING.md) before opening a pull request.
+
+## Releasing
+
+1. Add the changes under a new version heading in [CHANGELOG.md](CHANGELOG.md).
+2. Set the same `version` in `package.json`, merge to `main`.
+3. Tag it and push the tag:
 
 ```bash
-GH_TOKEN=$(gh auth token) npm run release
+git tag v1.2.0
 ```
 
-Installed copies pick the new version up within a few hours (or on next start) and offer **Update**.
-
-## Data
-
-`%APPDATA%\ai-usage-tracker-widget\`: `usage-data.json` (last readings and settings), `history.json` (7 days
-of readings), the sync debug files, and `Partitions\` (the Claude and Grok login sessions). Delete the folder
-to reset everything.
-
-## Project layout
-
+```bash
+git push origin v1.2.0
 ```
-src/
-  main.js          window, tray, sync loop, alerts, IPC
-  sync.js          sign-in windows and the Claude / Grok usage readers
-  insights.js      burn-rate pace and sparkline series from history
-  store.js         JSON persistence for readings, settings and history
-  updater.js       GitHub Releases auto-update
-  preload.js       safe bridge exposed to the UI as window.api
-  renderer/        widget UI (bars, rings, settings)
-```
+
+The [Release workflow](.github/workflows/release.yml) builds the installer on Windows, publishes it with the
+changelog section as release notes, and installed apps pick it up within a few hours.
+
+## Security
+
+Please report vulnerabilities privately — see [SECURITY.md](SECURITY.md).
 
 ## License
 
-MIT
+[MIT](LICENSE)

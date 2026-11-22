@@ -2,13 +2,14 @@ const REFRESH_MS = 60 * 1000;
 const MINUTE = 60 * 1000;
 const STALE_MS = 5 * MINUTE;
 const RING_LEN = 2 * Math.PI * 18;
-const SERVICES = ['claude', 'grok'];
+const RING_WIDTH = 76;
 
 let data = null;
 let mode = 'widget'; // or 'settings'
 
 const $ = (id) => document.getElementById(id);
-const $$ = (sel) => document.querySelectorAll(sel);
+const $$ = (sel, root = document) => root.querySelectorAll(sel);
+const clone = (id) => $(id).content.firstElementChild.cloneNode(true);
 
 function level(pct) {
   if (pct >= 90) return 'danger';
@@ -30,17 +31,6 @@ function timeText(iso) {
   return new Date(iso).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' });
 }
 
-// Current reading for a metric id, in one shape for both services.
-function metric(id) {
-  if (id === 'grok') {
-    const g = data.grok;
-    return { service: 'grok', pct: g.pct, reset: g.reset, connected: g.connected, total: g.total, remaining: g.remaining, unit: g.unit };
-  }
-  const c = data.claude;
-  const w = id === 'claude.session' ? c.session : c.weekly;
-  return { service: 'claude', pct: w?.pct ?? null, reset: w?.reset ?? null, connected: c.connected };
-}
-
 function untilReset(iso, now) {
   if (!iso) return null;
   const ms = Date.parse(iso) - now;
@@ -51,92 +41,127 @@ function sparkPoints(series, now) {
   if (!series || series.length < 2) return '';
   const t0 = series[0][0];
   const span = Math.max(now - t0, MINUTE);
-  return series.map(([t, v]) => `${(((t - t0) / span) * 48).toFixed(1)},${(14 - (Math.min(100, v) / 100) * 14).toFixed(1)}`).join(' ');
+  return series.map(([t, v]) => `${(((t - t0) / span) * 40).toFixed(1)},${(12 - (Math.min(100, v) / 100) * 12).toFixed(1)}`).join(' ');
+}
+
+function setLogo(svg, row) {
+  svg.querySelector('use').setAttribute('href', `#${row.logo}`);
+  svg.classList.toggle('claude', row.id === 'claude');
+}
+
+// Right-hand text of a limit: pace warning first, then reset countdown.
+function rightText(m, now) {
+  if (m.pace != null) {
+    return { text: `Out in ~${formatDuration(m.pace)}`, alert: true, title: 'At your pace over the last hour, this runs out before it resets' };
+  }
+  const left = untilReset(m.reset, now);
+  if (left != null) {
+    return { text: left === 0 ? 'Resetting…' : `Resets in ${formatDuration(left)}`, title: new Date(m.reset).toLocaleString() };
+  }
+  if (m.detail && m.detail.total != null) return { text: `${m.detail.remaining}/${m.detail.total} ${m.detail.unit} left` };
+  return { text: '' };
 }
 
 // ---------- Bars view ----------
-function renderMeter(el, id, now) {
-  const m = metric(id);
-  const p = m.pct ?? 0;
-  el.classList.remove('ok', 'warn', 'danger');
-  el.classList.add(level(p));
-  el.querySelector('.pct').textContent = m.pct == null ? '—' : `${Math.round(p)}%`;
-  el.querySelector('.fill').style.width = `${Math.min(100, p)}%`;
-  el.querySelector('.spark polyline').setAttribute('points', sparkPoints(data.insights?.spark?.[id], now));
-
-  const reset = el.querySelector('.reset');
-  const left = untilReset(m.reset, now);
-  if (left == null) {
-    reset.textContent = id === 'claude.session' && !m.pct ? 'Not started' : id === 'grok' ? '' : 'Reset time unknown';
-    reset.removeAttribute('title');
-  } else {
-    reset.textContent = left === 0 ? 'Resetting…' : `Resets in ${formatDuration(left)}`;
-    reset.title = new Date(m.reset).toLocaleString();
-  }
-
-  const pace = el.querySelector('.pace');
-  const eta = data.insights?.pace?.[id];
-  if (eta != null) {
-    pace.textContent = `Out in ~${formatDuration(eta)}`;
-    pace.title = 'At your pace over the last hour, this limit runs out before it resets';
-    pace.classList.add('alert');
-  } else {
-    pace.textContent = m.total != null ? `${m.remaining}/${m.total} ${m.unit} left` : '';
-    pace.removeAttribute('title');
-    pace.classList.remove('alert');
-  }
-}
-
 function renderBars(now) {
-  for (const name of SERVICES) {
-    const s = data[name];
-    $(`p-${name}`).classList.toggle('offline', !s.connected);
-    $(`${name}-error`).textContent = s.error ? `Sync problem: ${s.error}` : '';
+  const list = $('bars-list');
+  const nodes = data.rows.map((row) => {
+    const el = clone('tpl-provider');
+    el.classList.toggle('offline', !row.connected);
+    setLogo(el.querySelector('.logo'), row);
+    el.querySelector('.provider-name').textContent = row.name;
+    el.querySelector('.plan').textContent = row.plan || '';
+    el.querySelector('.open').addEventListener('click', () => window.api.openUrl(row.id));
+    el.querySelector('.signin').addEventListener('click', () => window.api.signIn(row.id));
+    el.querySelector('.card-error').textContent = row.error ? `Sync problem: ${row.error}` : '';
+
+    const metrics = el.querySelector('.metrics');
+    for (const m of row.metrics) {
+      const meter = clone('tpl-meter');
+      meter.classList.add(level(m.pct));
+      meter.querySelector('.label').textContent = m.label;
+      meter.querySelector('.pct').textContent = `${Math.round(m.pct)}%`;
+      meter.querySelector('.fill').style.width = `${Math.min(100, m.pct)}%`;
+      const points = sparkPoints(m.spark, now);
+      meter.querySelector('.spark polyline').setAttribute('points', points);
+      meter.querySelector('.spark').classList.toggle('empty', !points);
+      const right = rightText(m, now);
+      const r = meter.querySelector('.right');
+      r.textContent = right.text;
+      r.classList.toggle('alert', !!right.alert);
+      if (right.title) r.title = right.title;
+      metrics.append(meter);
+    }
+    if (row.connected && !row.metrics.length && !row.error) {
+      const note = document.createElement('div');
+      note.className = 'empty-note';
+      note.textContent = 'No limits reported for this plan yet';
+      metrics.append(note);
+    }
+    return el;
+  });
+  if (!nodes.length) {
+    const note = document.createElement('div');
+    note.className = 'all-hidden';
+    note.textContent = 'All providers are hidden. Turn one on in Settings.';
+    nodes.push(note);
   }
-  $('claude-plan').textContent = data.claude.plan ? (data.claude.plan.includes('max') ? 'Max' : 'Pro') : '';
-  $$('#bars .meter').forEach((el) => renderMeter(el, el.dataset.metric, now));
+  list.replaceChildren(...nodes);
 }
 
 // ---------- Ring view ----------
+function ringFor(row, m, now) {
+  const el = clone('tpl-ring');
+  setLogo(el.querySelector('.mini-logo'), row);
+  el.querySelector('.ring-label span').textContent = m ? (row.metrics.length > 1 ? m.label : row.name) : row.name;
+  const arc = el.querySelector('.arc');
+  arc.style.strokeDasharray = RING_LEN;
+  const sub = el.querySelector('.ring-sub');
+  if (!m) {
+    el.classList.add('offline');
+    arc.style.strokeDashoffset = RING_LEN;
+    el.querySelector('.ring-pct').textContent = '—';
+    sub.textContent = row.connected ? 'No data' : 'Sign in';
+    if (!row.connected) el.addEventListener('click', () => window.api.signIn(row.id));
+    el.title = row.name;
+    return el;
+  }
+  el.classList.add(level(m.pct));
+  arc.style.strokeDashoffset = RING_LEN * (1 - Math.min(100, m.pct) / 100);
+  el.querySelector('.ring-pct').textContent = `${Math.round(m.pct)}%`;
+  const left = untilReset(m.reset, now);
+  sub.textContent = m.pace != null ? `out ~${formatDuration(m.pace)}` : left ? formatDuration(left) : '';
+  el.title = `${row.name} ${m.label}${m.reset ? ` · resets ${new Date(m.reset).toLocaleString()}` : ''}`;
+  return el;
+}
+
 function renderRings(now) {
-  $$('#rings .ring').forEach((el) => {
-    const id = el.dataset.metric;
-    const m = metric(id);
-    const p = m.connected && m.pct != null ? m.pct : 0;
-    el.classList.toggle('offline', !m.connected);
-    el.classList.remove('ok', 'warn', 'danger');
-    el.classList.add(level(p));
-    const arc = el.querySelector('.arc');
-    arc.style.strokeDasharray = RING_LEN;
-    arc.style.strokeDashoffset = RING_LEN * (1 - Math.min(100, p) / 100);
-    el.querySelector('.ring-pct').textContent = m.connected && m.pct != null ? `${Math.round(p)}%` : '—';
-    const sub = el.querySelector('.ring-sub');
-    const eta = data.insights?.pace?.[id];
-    const left = untilReset(m.reset, now);
-    if (!m.connected) sub.textContent = 'Sign in';
-    else if (eta != null) sub.textContent = `out ~${formatDuration(eta)}`;
-    else sub.textContent = left ? formatDuration(left) : '';
-    el.title = m.connected && m.reset ? `Resets ${new Date(m.reset).toLocaleString()}` : '';
-  });
+  const rings = [];
+  for (const row of data.rows) {
+    if (row.connected && row.metrics.length) row.metrics.forEach((m) => rings.push(ringFor(row, m, now)));
+    else rings.push(ringFor(row, null, now));
+  }
+  $('ring-list').replaceChildren(...rings);
+  return rings.length;
 }
 
 // ---------- Title bar ----------
 function renderTitle(now) {
-  const last = SERVICES.map((n) => data[n].lastSync).filter(Boolean).sort().pop();
-  const anyConnected = SERVICES.some((n) => data[n].connected);
-  const anyError = SERVICES.some((n) => data[n].connected && data[n].error);
+  const connected = data.rows.filter((r) => r.connected);
+  const last = connected.map((r) => r.lastSync).filter(Boolean).sort().pop();
+  const anyError = connected.some((r) => r.error);
   const dot = $('status-dot');
   dot.className = 'status-dot';
   if (data.syncing) dot.classList.add('busy');
-  else if (anyConnected && (anyError || !last || now - Date.parse(last) > STALE_MS)) dot.classList.add('stale');
-  else if (anyConnected) dot.classList.add('ok');
+  else if (connected.length && (anyError || !last || now - Date.parse(last) > STALE_MS)) dot.classList.add('stale');
+  else if (connected.length) dot.classList.add('ok');
   dot.title = data.syncing ? 'Syncing' : last ? `Last synced ${timeText(last)}` : 'Not synced yet';
 
-  $('updated').textContent = mode === 'settings' || data.settings.view === 'rings' ? '' : last ? timeText(last) : '';
+  const rings = data.settings.view === 'rings';
+  $('updated').textContent = mode === 'settings' || rings ? '' : last ? timeText(last) : '';
   $('btn-sync').classList.toggle('spinning', !!data.syncing);
   $('btn-pin').setAttribute('aria-pressed', String(data.settings.alwaysOnTop));
   $('btn-pin').title = data.settings.alwaysOnTop ? 'Always on top: on' : 'Always on top: off';
-  const rings = data.settings.view === 'rings';
   $('btn-view').title = rings ? 'Detailed view' : 'Compact ring view';
   $('btn-view').querySelector('use').setAttribute('href', rings ? '#i-bars' : '#i-rings');
   const up = data.update || {};
@@ -158,19 +183,55 @@ function updateText(up) {
   }
 }
 
-function renderSettings() {
-  for (const name of SERVICES) {
-    const s = data[name];
-    const box = document.querySelector(`[data-account="${name}"]`);
-    const status = box.querySelector('.account-status');
-    status.textContent = s.connected
-      ? s.lastSync ? `Connected · synced ${timeText(s.lastSync)}` : 'Connected'
-      : 'Not signed in';
-    status.classList.toggle('ok', s.connected);
-    const btn = box.querySelector('.account-btn');
-    btn.textContent = s.connected ? 'Sign out' : 'Sign in';
-    btn.classList.toggle('primary', !s.connected);
+// Provider rows in settings are built once and then updated in place, so a
+// select or switch keeps focus while syncs come in.
+function renderProviderSettings() {
+  const box = $('provider-settings');
+  for (const p of data.providers) {
+    let el = box.querySelector(`[data-provider="${p.id}"]`);
+    if (!el) {
+      el = clone('tpl-provider-setting');
+      el.dataset.provider = p.id;
+      setLogo(el.querySelector('.logo'), p);
+      el.querySelector('.account-name').textContent = p.name;
+      const select = el.querySelector('.plan-select');
+      for (const o of p.plans) select.append(new Option(o.label, o.key));
+      select.addEventListener('change', async () => {
+        data = await window.api.saveProvider(p.id, { plan: select.value });
+        render();
+      });
+      el.querySelector('.show-toggle').addEventListener('change', async (e) => {
+        data = await window.api.saveProvider(p.id, { enabled: e.target.checked });
+        render();
+      });
+      el.querySelector('.account-btn').addEventListener('click', async () => {
+        const cur = data.providers.find((x) => x.id === p.id);
+        if (cur.connected) {
+          data = await window.api.signOut(p.id);
+          render();
+        } else {
+          window.api.signIn(p.id);
+        }
+      });
+      box.append(el);
+    }
+    el.classList.toggle('off', !p.enabled);
+    el.querySelector('.show-toggle').checked = p.enabled;
+    const select = el.querySelector('.plan-select');
+    if (document.activeElement !== select) select.value = p.plan;
+    const status = el.querySelector('.account-status');
+    status.textContent = !p.enabled ? 'Hidden'
+      : p.connected ? (p.lastSync ? `Connected · synced ${timeText(p.lastSync)}` : 'Connected')
+        : 'Not signed in';
+    status.classList.toggle('ok', p.enabled && p.connected);
+    const btn = el.querySelector('.account-btn');
+    btn.textContent = p.connected ? 'Sign out' : 'Sign in';
+    btn.classList.toggle('primary', !p.connected);
   }
+}
+
+function renderSettings() {
+  renderProviderSettings();
   const up = data.update || {};
   $('about-version').textContent = `Version ${data.version}`;
   $('about-update').textContent = updateText(up);
@@ -209,22 +270,25 @@ function render() {
   $('settings').classList.toggle('hidden', mode !== 'settings');
   $('title-text').textContent = mode === 'settings' ? 'Settings' : 'Usage';
   renderTitle(now);
+  let ringCount = 0;
   if (mode === 'settings') renderSettings();
-  else if (rings) renderRings(now);
+  else if (rings) ringCount = renderRings(now);
   else renderBars(now);
-  fit();
+  fit(ringCount);
 }
 
 // Sizes the window to its content so the widget never shows empty space.
 let fitFrame = 0;
-function fit() {
+function fit(ringCount) {
   cancelAnimationFrame(fitFrame);
   fitFrame = requestAnimationFrame(() => {
     const view = mode === 'settings' ? $('settings') : data.settings.view === 'rings' ? $('rings') : $('bars');
     const inner = view.querySelector('.inner');
     const chrome = document.querySelector('.titlebar').offsetHeight + 2; // + body border
     const height = chrome + inner.offsetHeight;
-    window.api.fit(mode, mode === 'settings' ? Math.min(height, 620) : height);
+    // Rings need room for the title-bar buttons even with one ring.
+    const width = mode === 'widget' && data.settings.view === 'rings' ? Math.max(200, ringCount * RING_WIDTH + 26) : undefined;
+    window.api.fit(mode, mode === 'settings' ? Math.min(height, 640) : height, width);
   });
 }
 
@@ -246,22 +310,6 @@ function wire() {
   });
   $('btn-close').addEventListener('click', () => (mode === 'settings' ? showSettings(false) : window.api.windowAction('close')));
   $('btn-update').addEventListener('click', () => window.api.installUpdate());
-  $$('[data-open]').forEach((b) => b.addEventListener('click', () => window.api.openUrl(b.dataset.open)));
-  $$('[data-signin]').forEach((b) => b.addEventListener('click', () => window.api.signIn(b.dataset.signin)));
-  $$('#rings .ring').forEach((el) => el.addEventListener('click', () => {
-    if (el.classList.contains('offline')) window.api.signIn(el.dataset.service);
-  }));
-
-  for (const name of SERVICES) {
-    document.querySelector(`[data-account="${name}"] .account-btn`).addEventListener('click', async () => {
-      if (data[name].connected) {
-        data = await window.api.signOut(name);
-        render();
-      } else {
-        window.api.signIn(name);
-      }
-    });
-  }
 
   // Settings apply as soon as they change.
   const toggles = {

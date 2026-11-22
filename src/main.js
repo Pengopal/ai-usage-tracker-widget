@@ -2,23 +2,18 @@ const {
   app, BrowserWindow, ipcMain, Tray, Menu, nativeImage, shell, Notification, screen,
 } = require('electron');
 const path = require('path');
-const { Store, normalize, cleanThresholds } = require('./store');
-const sync = require('./sync');
+const { Store, cleanThresholds } = require('./store');
+const { services } = require('./sync');
 const updater = require('./updater');
-const { METRICS, computeInsights, sampleOf } = require('./insights');
+const { computeInsights, sampleOf } = require('./insights');
+const { CATALOG, PROVIDER_IDS, emptyService, planOptions, buildRows } = require('./providers');
 
-const DEFAULT_WIDTH = { bars: 340, rings: 264 };
+const DEFAULT_WIDTH = { bars: 320, rings: 264 };
 const DEFAULT_HEIGHT = 200;
 const SYNC_MS = 60 * 1000;
 const PACE_ALERT_MS = 30 * 60 * 1000;
 const BACK_FROM_PCT = 90;
 const BACK_BELOW_PCT = 50;
-const SERVICES = { claude: sync.claude, grok: sync.grok };
-const LABELS = {
-  'claude.session': 'Claude 5-hour session',
-  'claude.weekly': 'Claude weekly limit',
-  grok: 'Grok usage',
-};
 
 let win = null;
 let tray = null;
@@ -55,6 +50,7 @@ function makeIcon(size) {
 
 const view = () => store.data.settings.view;
 const savedWidth = (v = view()) => store.data.bounds?.widths?.[v] || DEFAULT_WIDTH[v];
+const enabledIds = () => PROVIDER_IDS.filter((id) => store.data.settings.providers[id]?.enabled !== false);
 
 function initialBounds() {
   const saved = store.data.bounds;
@@ -77,8 +73,8 @@ function initialBounds() {
 function createWindow() {
   win = new BrowserWindow({
     ...initialBounds(),
-    minWidth: 240,
-    minHeight: 80,
+    minWidth: 220,
+    minHeight: 60,
     frame: false,
     backgroundColor: '#0e0e12',
     resizable: true,
@@ -108,7 +104,7 @@ function createWindow() {
       if (!win || win.isDestroyed() || win.isMinimized()) return;
       const b = win.getBounds();
       const widths = { ...(store.data.bounds?.widths || {}) };
-      if (mode === 'widget') widths[view()] = b.width;
+      if (mode === 'widget' && view() === 'bars') widths.bars = b.width;
       store.set({ bounds: { x: b.x, y: b.y, widths } });
     }, 400);
   };
@@ -138,22 +134,16 @@ function showWindow() {
   win.focus();
 }
 
-function setAlwaysOnTop(on) {
-  store.set({ settings: { ...store.data.settings, alwaysOnTop: on } });
-  win.setAlwaysOnTop(on, 'floating');
+function saveSettings(patch) {
+  store.set({ settings: { ...store.data.settings, ...patch } });
+  win.setAlwaysOnTop(store.data.settings.alwaysOnTop, 'floating');
   refreshTrayMenu();
   pushData();
 }
 
 function setView(next) {
   if (next === view()) return;
-  store.set({ settings: { ...store.data.settings, view: next } });
-  const b = win.getBounds();
-  const width = savedWidth(next);
-  // Keep the right edge anchored: the widget usually lives at the screen's right side.
-  win.setBounds({ ...b, x: b.x + b.width - width, width });
-  refreshTrayMenu();
-  pushData();
+  saveSettings({ view: next });
 }
 
 function refreshTrayMenu() {
@@ -172,14 +162,13 @@ function refreshTrayMenu() {
       label: 'Always on top',
       type: 'checkbox',
       checked: store.data.settings.alwaysOnTop,
-      click: (item) => setAlwaysOnTop(item.checked),
+      click: (item) => saveSettings({ alwaysOnTop: item.checked }),
     },
     { type: 'separator' },
     ...(up.status === 'ready'
       ? [{ label: `Restart to update (v${up.version})`, click: installUpdate }, { type: 'separator' }]
       : []),
-    { label: 'Open claude.ai usage', click: () => shell.openExternal(sync.claude.browserUrl) },
-    { label: 'Open grok.com', click: () => shell.openExternal(sync.grok.browserUrl) },
+    ...enabledIds().map((id) => ({ label: `Open ${CATALOG[id].name}`, click: () => shell.openExternal(CATALOG[id].url) })),
     { type: 'separator' },
     { label: 'Quit', click: () => { quitting = true; app.quit(); } },
   ]));
@@ -193,10 +182,23 @@ function createTray() {
 }
 
 function snapshot() {
+  const { services: data, settings } = store.data;
+  const insights = computeInsights(data, store.history);
   return {
-    ...store.data,
+    settings,
     syncing,
-    insights: computeInsights(store.data, store.history),
+    rows: buildRows(data, settings.providers, insights),
+    providers: PROVIDER_IDS.map((id) => ({
+      id,
+      name: CATALOG[id].name,
+      logo: CATALOG[id].logo,
+      enabled: settings.providers[id].enabled,
+      plan: settings.providers[id].plan,
+      plans: planOptions(id),
+      connected: data[id].connected,
+      lastSync: data[id].lastSync,
+      error: data[id].error,
+    })),
     update: updater.getState(),
     version: app.getVersion(),
   };
@@ -208,27 +210,36 @@ function pushData() {
 
 // Folds one service's sync result into what is stored. Network errors keep the
 // last good numbers on screen and only set the error text.
-function merge(name, result) {
-  const prev = store.data[name];
+function merge(id, result) {
+  const prev = store.data.services[id];
   if (result.status === 'rejected') return { ...prev, error: result.reason?.message || 'Sync failed' };
   const { raw, ...value } = result.value;
-  store.writeDebug(name, raw);
-  if (!value.connected) return { ...normalize({})[name], connected: false };
+  store.writeDebug(id, raw);
+  if (!value.connected) return emptyService();
   if (value.error) return { ...prev, connected: true, error: value.error };
-  return { ...prev, ...value, error: null, lastSync: new Date().toISOString() };
+  return {
+    connected: true,
+    windows: value.windows || {},
+    plan: value.plan ?? prev.plan ?? null,
+    detail: value.detail || null,
+    error: null,
+    lastSync: new Date().toISOString(),
+  };
 }
+
+const readService = (id) => services[id].read({ grokModel: store.data.settings.grokModel });
 
 async function syncAll() {
   if (syncing) return;
   syncing = true;
   pushData();
   try {
-    const [c, g] = await Promise.allSettled([
-      sync.syncClaude(),
-      sync.syncGrok(store.data.settings.grokModel),
-    ]);
-    store.set({ claude: merge('claude', c), grok: merge('grok', g) });
-    store.addSample(sampleOf(store.data));
+    const ids = enabledIds();
+    const results = await Promise.allSettled(ids.map(readService));
+    const next = { ...store.data.services };
+    ids.forEach((id, i) => { next[id] = merge(id, results[i]); });
+    store.set({ services: next });
+    store.addSample(sampleOf(store.data.services));
   } finally {
     syncing = false;
     checkAlerts();
@@ -237,55 +248,56 @@ async function syncAll() {
 }
 
 function notifyUser(title, body) {
-  new Notification({ title, body, icon: makeIcon(64), silent: false }).show();
+  new Notification({ title, body, icon: makeIcon(64) }).show();
 }
 
 const windowKey = (id, reset) => `${id}@${reset ? reset.slice(0, 13) : 'rolling'}`;
 
 // Threshold alerts once per threshold per reset window; a pace heads-up when the
 // current burn rate runs out within 30 minutes; and a note when a limit is back.
+// Only limits the widget shows (enabled provider, chosen plan) raise alerts.
 function checkAlerts() {
   const d = store.data;
   const s = d.settings;
   const can = s.notifications && Notification.isSupported();
-  const insights = computeInsights(d, store.history);
   const thresholds = [...s.thresholds].sort((a, b) => b - a);
+  const lowest = thresholds[thresholds.length - 1] ?? 75;
+  const insights = computeInsights(d.services, store.history);
   const notified = {};
   const lastPct = { ...d.lastPct };
 
-  for (const [id, m] of Object.entries(METRICS)) {
-    const cur = m.read(d);
-    if (!cur || cur.pct == null) continue;
-    const { pct, reset } = cur;
-    const key = windowKey(id, reset);
+  for (const row of buildRows(d.services, s.providers, insights)) {
+    for (const m of row.metrics) {
+      const label = `${row.name} ${m.label.toLowerCase()} limit`;
+      const key = windowKey(m.id, m.reset);
 
-    // A drop back under the lowest threshold starts a fresh cycle for rolling windows.
-    let prev = d.notified[key] || 0;
-    if (pct < (thresholds[thresholds.length - 1] ?? 75)) prev = 0;
-    notified[key] = prev;
-    const hit = thresholds.find((t) => pct >= t);
-    if (hit && hit > prev) {
-      notified[key] = hit;
-      if (can) {
-        notifyUser(
-          `${LABELS[id]} at ${pct}%`,
-          hit >= 100 ? 'Limit reached.' : hit >= 90 ? 'You are nearly out of usage.' : `You have used over ${hit}% of this limit.`,
-        );
+      // A drop back under the lowest threshold starts a fresh cycle for rolling windows.
+      let prev = d.notified[key] || 0;
+      if (m.pct < lowest) prev = 0;
+      notified[key] = prev;
+      const hit = thresholds.find((t) => m.pct >= t);
+      if (hit && hit > prev) {
+        notified[key] = hit;
+        if (can) {
+          notifyUser(
+            `${label} at ${m.pct}%`,
+            hit >= 100 ? 'Limit reached.' : hit >= 90 ? 'You are nearly out of usage.' : `You have used over ${hit}% of this limit.`,
+          );
+        }
       }
-    }
 
-    const paceKey = `pace:${key}`;
-    const eta = insights.pace[id];
-    if (d.notified[paceKey]) notified[paceKey] = true;
-    if (s.paceAlerts && eta != null && eta <= PACE_ALERT_MS && !d.notified[paceKey]) {
-      notified[paceKey] = true;
-      if (can) notifyUser(`${LABELS[id]}: heads-up`, `At your current pace you'll hit the limit in about ${Math.max(1, Math.round(eta / 60000))} minutes.`);
-    }
+      const paceKey = `pace:${key}`;
+      if (d.notified[paceKey]) notified[paceKey] = true;
+      if (s.paceAlerts && m.pace != null && m.pace <= PACE_ALERT_MS && !d.notified[paceKey]) {
+        notified[paceKey] = true;
+        if (can) notifyUser(`${label}: heads-up`, `At your current pace you'll hit it in about ${Math.max(1, Math.round(m.pace / 60000))} minutes.`);
+      }
 
-    if (s.backAlerts && can && lastPct[id] >= BACK_FROM_PCT && pct < BACK_BELOW_PCT) {
-      notifyUser(`${LABELS[id]} is back`, `Usage reset to ${pct}%. You're good to go.`);
+      if (s.backAlerts && can && lastPct[m.id] >= BACK_FROM_PCT && m.pct < BACK_BELOW_PCT) {
+        notifyUser(`${label} is back`, `Usage reset to ${m.pct}%. You're good to go.`);
+      }
+      lastPct[m.id] = m.pct;
     }
-    lastPct[id] = pct;
   }
 
   if (JSON.stringify(notified) !== JSON.stringify(d.notified) || JSON.stringify(lastPct) !== JSON.stringify(d.lastPct)) {
@@ -303,12 +315,20 @@ function registerIpc() {
 
   ipcMain.handle('save-settings', (_e, patch) => {
     const before = store.data.settings;
-    const settings = { ...before, ...patch };
-    if ('thresholds' in patch) settings.thresholds = cleanThresholds(patch.thresholds);
-    store.set({ settings });
-    win.setAlwaysOnTop(store.data.settings.alwaysOnTop, 'floating');
-    refreshTrayMenu();
-    if (patch.grokModel !== undefined && patch.grokModel !== before.grokModel) syncAll();
+    const next = { ...patch };
+    if ('thresholds' in next) next.thresholds = cleanThresholds(next.thresholds);
+    saveSettings(next);
+    if (next.grokModel !== undefined && next.grokModel !== before.grokModel) syncAll();
+    return snapshot();
+  });
+
+  // Show/hide a provider or pick its plan.
+  ipcMain.handle('save-provider', (_e, id, patch) => {
+    if (!CATALOG[id]) return snapshot();
+    const wasEnabled = store.data.settings.providers[id].enabled;
+    const providers = { ...store.data.settings.providers, [id]: { ...store.data.settings.providers[id], ...patch } };
+    saveSettings({ providers });
+    if (!wasEnabled && providers[id].enabled) syncAll();
     return snapshot();
   });
 
@@ -318,29 +338,26 @@ function registerIpc() {
 
   // Opens the real sign-in page in its own window. Once the session can read
   // usage, that window closes and the widget comes back to the front, synced.
-  ipcMain.on('sign-in', (_e, name) => {
-    const svc = SERVICES[name];
+  ipcMain.on('sign-in', (_e, id) => {
+    const svc = services[id];
     if (!svc) return;
-    const probe = name === 'claude'
-      ? async () => (await sync.syncClaude()).connected
-      : async () => (await sync.syncGrok(store.data.settings.grokModel)).connected;
-    svc.openLogin(probe, async () => {
+    svc.openLogin(async () => (await readService(id)).connected, async () => {
       await syncAll();
       showWindow();
     });
   });
 
-  ipcMain.handle('sign-out', async (_e, name) => {
-    const svc = SERVICES[name];
+  ipcMain.handle('sign-out', async (_e, id) => {
+    const svc = services[id];
     if (!svc) return snapshot();
     await svc.signOut();
-    store.set({ [name]: normalize({})[name] });
+    store.setService(id, emptyService());
     pushData();
     return snapshot();
   });
 
   ipcMain.handle('toggle-always-on-top', () => {
-    setAlwaysOnTop(!store.data.settings.alwaysOnTop);
+    saveSettings({ alwaysOnTop: !store.data.settings.alwaysOnTop });
     return store.data.settings.alwaysOnTop;
   });
 
@@ -350,26 +367,31 @@ function registerIpc() {
     if (action === 'close') win.close();
   });
 
-  // The renderer reports its content height; the window grows or shrinks to fit,
-  // staying on screen. Settings may ask for more room than the widget.
+  // The renderer reports the size its content needs; the window follows, staying
+  // on screen and anchored at its right edge. Ring view also sets the width.
+  let lastLayout = null; // 'settings' | 'rings' | 'bars'
   ipcMain.on('fit', (_e, next) => {
-    const leavingSettings = mode === 'settings' && next.mode !== 'settings';
     mode = next.mode === 'settings' ? 'settings' : 'widget';
+    const layout = mode === 'settings' ? 'settings' : next.width ? 'rings' : 'bars';
     const b = win.getBounds();
     const { workArea } = screen.getDisplayMatching(b);
-    const height = Math.max(80, Math.min(Math.ceil(next.height), workArea.height));
-    // Widget width is whatever the user dragged it to; settings borrows extra room.
-    const width = mode === 'settings' ? Math.max(b.width, 340) : leavingSettings ? savedWidth() : b.width;
-    const x = b.x + b.width - width;
-    const y = Math.min(b.y, workArea.y + workArea.height - height);
+    const height = Math.max(60, Math.min(Math.ceil(next.height), workArea.height));
+    // Bars keep whatever width the user dragged them to, restored after the
+    // other layouts borrowed the window.
+    let width = b.width;
+    if (layout === 'settings') width = Math.max(b.width, 340);
+    else if (layout === 'rings') width = Math.ceil(next.width);
+    else if (lastLayout && lastLayout !== 'bars') width = savedWidth('bars');
+    lastLayout = layout;
+    const x = Math.max(workArea.x, b.x + b.width - width);
+    const y = Math.max(workArea.y, Math.min(b.y, workArea.y + workArea.height - height));
     if (b.height !== height || b.width !== width || b.x !== x || b.y !== y) {
-      win.setBounds({ x: Math.max(workArea.x, x), y: Math.max(workArea.y, y), width, height });
+      win.setBounds({ x, y, width, height });
     }
   });
 
-  ipcMain.on('open-url', (_e, name) => {
-    const svc = SERVICES[name];
-    if (svc) shell.openExternal(svc.browserUrl);
+  ipcMain.on('open-url', (_e, id) => {
+    if (CATALOG[id]) shell.openExternal(CATALOG[id].url);
   });
 
   ipcMain.on('update-check', () => updater.check());

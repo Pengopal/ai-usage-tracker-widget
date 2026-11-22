@@ -1,0 +1,37 @@
+name: Bug report
+description: Something doesn't work the way it should.
+labels: [bug]
+body:
+  - type: textarea
+    id: what
+    attributes:
+      label: What happened?
+      description: What you expected, and what happened instead.
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps to reproduce
+      placeholder: |
+        1. Sign in to ...
+        2. Click ...
+    validations:
+      required: true
+  - type: dropdown
+    id: provider
+    attributes:
+      label: Provider
+      multiple: true
+      options: [Claude, ChatGPT, Grok, Not provider-specific]
+  - type: input
+    id: version
+    attributes:
+      label: App version and Windows version
+      placeholder: e.g. 1.2.0 on Windows 11 24H2
+  - type: textarea
+    id: debug
+    attributes:
+      label: Sync debug file (for sync problems)
+      description: The matching sync-debug-*.json from %APPDATA%\ai-usage-tracker-widget. Check it holds nothing personal first.
+      render: json

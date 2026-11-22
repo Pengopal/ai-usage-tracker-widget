@@ -1,22 +1,29 @@
 // Derived views over the stored reading history: burn-rate pace and sparklines.
+// History samples look like { t, v: { 'claude.session': 14, 'grok.weekly': 43, … } }.
 const MINUTE = 60 * 1000;
 const PACE_LOOKBACK = 90 * MINUTE;
 const PACE_MIN_SPAN = 10 * MINUTE;
 const SPARK_SPAN = 24 * 60 * MINUTE;
 
-// Metric keys used in history samples.
-const METRICS = {
-  'claude.session': { key: 'cs', read: (d) => d.claude.session },
-  'claude.weekly': { key: 'cw', read: (d) => d.claude.weekly },
-  grok: { key: 'g', read: (d) => (d.grok.pct == null ? null : { pct: d.grok.pct, reset: d.grok.reset }) },
-};
+// Every metric with a reading: { 'claude.session': { pct, reset }, … }.
+function currentReadings(services) {
+  const out = {};
+  for (const [id, s] of Object.entries(services || {})) {
+    for (const [m, w] of Object.entries((s && s.windows) || {})) {
+      if (w && w.pct != null) out[`${id}.${m}`] = w;
+    }
+  }
+  return out;
+}
+
+const valueOf = (sample, key) => (sample.v ? sample.v[key] : undefined);
 
 // Points since the most recent reset (a drop of more than a point), within the lookback.
 function currentWindow(history, key, now) {
-  const pts = history.filter((s) => s[key] != null && now - s.t <= PACE_LOOKBACK);
+  const pts = history.filter((s) => valueOf(s, key) != null && now - s.t <= PACE_LOOKBACK);
   let start = 0;
   for (let i = 1; i < pts.length; i++) {
-    if (pts[i][key] < pts[i - 1][key] - 1) start = i;
+    if (valueOf(pts[i], key) < valueOf(pts[i - 1], key) - 1) start = i;
   }
   return pts.slice(start);
 }
@@ -29,7 +36,7 @@ function pace(history, key, current, now) {
   if (pts.length < 2) return null;
   const first = pts[0];
   const span = now - first.t;
-  const gained = current.pct - first[key];
+  const gained = current.pct - valueOf(first, key);
   if (span < PACE_MIN_SPAN || gained <= 0.5) return null;
   const etaMs = ((100 - current.pct) / gained) * span;
   const resetMs = current.reset ? Date.parse(current.reset) - now : Infinity;
@@ -37,25 +44,31 @@ function pace(history, key, current, now) {
   return Math.round(etaMs);
 }
 
-function computeInsights(data, history, now = Date.now()) {
+function computeInsights(services, history, now = Date.now()) {
   const out = { pace: {}, spark: {} };
-  for (const [id, m] of Object.entries(METRICS)) {
-    const current = m.read(data);
-    out.pace[id] = pace(history, m.key, current, now);
-    out.spark[id] = history
-      .filter((s) => s[m.key] != null && now - s.t <= SPARK_SPAN)
-      .map((s) => [s.t, s[m.key]]);
+  for (const [key, current] of Object.entries(currentReadings(services))) {
+    out.pace[key] = pace(history, key, current, now);
+    out.spark[key] = history
+      .filter((s) => valueOf(s, key) != null && now - s.t <= SPARK_SPAN)
+      .map((s) => [s.t, valueOf(s, key)]);
   }
   return out;
 }
 
-function sampleOf(data, now = Date.now()) {
-  const s = { t: now };
-  for (const m of Object.values(METRICS)) {
-    const cur = m.read(data);
-    s[m.key] = cur && cur.pct != null ? cur.pct : null;
-  }
-  return s;
+function sampleOf(services, now = Date.now()) {
+  const v = {};
+  for (const [key, w] of Object.entries(currentReadings(services))) v[key] = w.pct;
+  return { t: now, v };
 }
 
-module.exports = { METRICS, computeInsights, sampleOf, pace };
+// v1.1 stored { t, cs, cw, g }.
+function migrateSample(s) {
+  if (!s || s.v) return s;
+  const v = {};
+  if (s.cs != null) v['claude.session'] = s.cs;
+  if (s.cw != null) v['claude.weekly'] = s.cw;
+  if (s.g != null) v['grok.weekly'] = s.g;
+  return { t: s.t, v };
+}
+
+module.exports = { computeInsights, sampleOf, currentReadings, migrateSample, pace };

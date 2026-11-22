@@ -1,28 +1,21 @@
 // Tiny JSON-file store kept in Electron's userData folder.
 const fs = require('fs');
 const path = require('path');
+const { PROVIDER_IDS, emptyService, defaultProviderSettings } = require('./providers');
+const { migrateSample } = require('./insights');
 
 const HISTORY_KEEP_MS = 7 * 24 * 3600 * 1000;
 const HISTORY_MIN_GAP_MS = 5 * 60 * 1000;
 
-const DEFAULTS = {
-  // Last values read from claude.ai / grok.com, kept so the widget has something
-  // to show at startup before the first sync finishes.
-  claude: { connected: false, session: null, weekly: null, extra: [], plan: null, lastSync: null, error: null },
-  grok: { connected: false, pct: null, remaining: null, total: null, unit: null, windowSeconds: null, reset: null, lastSync: null, error: null },
-  settings: {
-    alwaysOnTop: true,
-    notifications: true,
-    thresholds: [75, 90, 100],
-    paceAlerts: true,
-    backAlerts: true,
-    minimizeToTray: true,
-    view: 'bars',
-    grokModel: '',
-  },
-  notified: {},
-  lastPct: {},
-  bounds: null,
+const DEFAULT_SETTINGS = {
+  alwaysOnTop: true,
+  notifications: true,
+  thresholds: [75, 90, 100],
+  paceAlerts: true,
+  backAlerts: true,
+  minimizeToTray: true,
+  view: 'bars',
+  grokModel: '',
 };
 
 function cleanThresholds(list) {
@@ -32,14 +25,46 @@ function cleanThresholds(list) {
   return [...new Set(nums)].sort((a, b) => a - b);
 }
 
+// v1.1 kept claude { session, weekly, plan } and grok { pct, reset, … } at the top level.
+function migrateService(id, old) {
+  if (!old || typeof old !== 'object') return null;
+  if (id === 'claude' && ('session' in old || 'weekly' in old)) {
+    const plan = old.plan ? (old.plan.includes('max') ? 'max' : 'pro') : null;
+    return { ...emptyService(), connected: !!old.connected, windows: { session: old.session, weekly: old.weekly }, plan, lastSync: old.lastSync, error: old.error };
+  }
+  if (id === 'grok' && 'pct' in old) {
+    const windows = old.pct != null ? { weekly: { pct: old.pct, reset: old.reset } } : {};
+    const detail = old.total != null ? { remaining: old.remaining, total: old.total, unit: old.unit } : null;
+    return { ...emptyService(), connected: !!old.connected, windows, detail, lastSync: old.lastSync, error: old.error };
+  }
+  return null;
+}
+
+function normalizeService(raw) {
+  const s = { ...emptyService(), ...(raw && typeof raw === 'object' ? raw : {}) };
+  // Drop empty windows so "no data" is just a missing key.
+  s.windows = Object.fromEntries(Object.entries(s.windows || {}).filter(([, w]) => w && w.pct != null));
+  return s;
+}
+
 function normalize(raw) {
   const r = raw && typeof raw === 'object' ? raw : {};
-  const settings = { ...DEFAULTS.settings, ...(r.settings || {}) };
+  const settings = { ...DEFAULT_SETTINGS, ...(r.settings || {}) };
   settings.thresholds = cleanThresholds(settings.thresholds);
   if (!['bars', 'rings'].includes(settings.view)) settings.view = 'bars';
+  const providers = defaultProviderSettings();
+  for (const id of PROVIDER_IDS) {
+    const p = r.settings?.providers?.[id];
+    if (p) providers[id] = { enabled: p.enabled !== false, plan: typeof p.plan === 'string' ? p.plan : 'auto' };
+  }
+  settings.providers = providers;
+
+  const services = {};
+  for (const id of PROVIDER_IDS) {
+    services[id] = normalizeService(r.services?.[id] || migrateService(id, r[id]));
+  }
   return {
-    claude: { ...DEFAULTS.claude, ...(r.claude && 'connected' in r.claude ? r.claude : {}) },
-    grok: { ...DEFAULTS.grok, ...(r.grok && 'connected' in r.grok ? r.grok : {}) },
+    services,
     settings,
     notified: r.notified && typeof r.notified === 'object' ? r.notified : {},
     lastPct: r.lastPct && typeof r.lastPct === 'object' ? r.lastPct : {},
@@ -67,9 +92,9 @@ class Store {
     fs.mkdirSync(dir, { recursive: true });
     this.file = path.join(dir, 'usage-data.json');
     this.historyFile = path.join(dir, 'history.json');
-    this.data = normalize(readJson(this.file, DEFAULTS));
+    this.data = normalize(readJson(this.file, {}));
     const h = readJson(this.historyFile, []);
-    this.history = Array.isArray(h) ? h : [];
+    this.history = (Array.isArray(h) ? h : []).map(migrateSample).filter(Boolean);
   }
 
   save() {
@@ -82,10 +107,14 @@ class Store {
     return this.data;
   }
 
+  setService(id, value) {
+    return this.set({ services: { ...this.data.services, [id]: value } });
+  }
+
   // One reading per sync when something moved, otherwise one every 5 minutes.
   addSample(sample) {
     const last = this.history[this.history.length - 1];
-    const same = last && ['cs', 'cw', 'g'].every((k) => last[k] === sample[k]);
+    const same = last && JSON.stringify(last.v) === JSON.stringify(sample.v);
     if (last && same && sample.t - last.t < HISTORY_MIN_GAP_MS) return;
     this.history.push(sample);
     this.history = this.history.filter((s) => sample.t - s.t <= HISTORY_KEEP_MS);
@@ -100,4 +129,4 @@ class Store {
   }
 }
 
-module.exports = { Store, normalize, cleanThresholds };
+module.exports = { Store, normalize, cleanThresholds, DEFAULT_SETTINGS };

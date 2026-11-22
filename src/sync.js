@@ -1,9 +1,11 @@
-// Reads real usage from claude.ai and grok.com using a session the user signs in to
-// once inside the app. Requests run inside a hidden window on each site, so they
-// carry the site's own cookies exactly like the official usage pages do.
+// Reads real usage from claude.ai, chatgpt.com and grok.com using a session the
+// user signs in to once inside the app. Requests run inside a hidden window on
+// each site, so they carry the site's own cookies exactly like the official
+// usage pages do.
 //
 // These are the sites' internal endpoints, not public APIs; they can change.
 const { BrowserWindow, session } = require('electron');
+const { parseClaude, parseOpenAI, parseGrok } = require('./parsers');
 
 function chromeUserAgent() {
   const major = process.versions.chrome.split('.')[0];
@@ -31,10 +33,33 @@ const CLAUDE_JS = `(async () => {
   for (const o of list) {
     const u = await get('/api/organizations/' + o.uuid + '/usage');
     if (u.status === 200 && u.body && (u.body.five_hour || u.body.seven_day)) {
-      return { auth: true, org: { name: o.name, capabilities: o.capabilities }, usage: u.body };
+      return { auth: true, org: { capabilities: o.capabilities, rate_limit_tier: o.rate_limit_tier }, usage: u.body };
     }
   }
   return { auth: true, error: 'No usage data found for this account' };
+})()`;
+
+// ChatGPT's session endpoint hands the page a short-lived access token; the
+// usage call needs it as a bearer token. The token never leaves this page.
+const OPENAI_JS = `(async () => {
+  try {
+    const s = await fetch('/api/auth/session', { credentials: 'include', headers: { accept: 'application/json' } });
+    let sess = null;
+    try { sess = await s.json(); } catch {}
+    if (!sess || !sess.accessToken) return { auth: false };
+    const plan = (sess.account && (sess.account.planType || sess.account.plan_type)) || null;
+    const r = await fetch('/backend-api/wham/usage', {
+      credentials: 'include',
+      headers: { accept: 'application/json', authorization: 'Bearer ' + sess.accessToken },
+    });
+    let body = null;
+    try { body = await r.json(); } catch {}
+    if (r.status === 401) return { auth: false };
+    if (r.status !== 200) return { auth: true, plan, error: 'usage HTTP ' + r.status };
+    return { auth: true, plan, usage: body };
+  } catch (err) {
+    return { auth: true, error: err && err.message ? err.message : 'usage request failed' };
+  }
 })()`;
 
 // Signed-in usage on grok.com. The usage page calls GetGrokCreditsConfig, which
@@ -82,101 +107,9 @@ const grokJs = (model) => `(async () => {
   }
 })()`;
 
-const pct = (v) => (Number.isFinite(Number(v)) ? Math.min(100, Math.max(0, Math.round(Number(v) * 10) / 10)) : 0);
-
-function parseClaude(res) {
-  const u = res.usage;
-  const window = (w) => (w ? { pct: pct(w.utilization), reset: w.resets_at || null } : null);
-  return {
-    session: window(u.five_hour),
-    weekly: window(u.seven_day),
-    // Model-specific weekly caps (e.g. Opus) appear on some plans.
-    extra: Object.entries(u)
-      .filter(([k, v]) => k.startsWith('seven_day_') && v && v.utilization != null)
-      .map(([k, v]) => ({ key: k, label: k.replace('seven_day_', '').replace(/_/g, ' '), ...window(v) })),
-    plan: (res.org.capabilities || []).find((c) => /claude_(pro|max)/.test(c)) || null,
-  };
-}
-
-const finite = (v) => {
-  const n = Number(v);
-  return Number.isFinite(n) ? n : null;
-};
-// Cent / credit amounts arrive as { val } or a bare number.
-const amount = (v) => (v != null && typeof v === 'object' ? finite(v.val) : finite(v));
-
-// Weekly (or monthly) included pool from GetGrokCreditsConfig. An omitted
-// percent on a known period is 0% — proto3 does not send the zero scalar.
-function creditsWindow(l) {
-  const period = l.currentPeriod || l.current_period || null;
-  let used = finite(l.creditUsagePercent ?? l.credit_usage_percent ?? l.usagePercent ?? l.usedPercent);
-  const stamp = (v) => {
-    if (!v) return null;
-    if (typeof v === 'string') return v;
-    if (typeof v === 'object' && v.seconds != null) {
-      const ms = Number(v.seconds) * 1000 + Number(v.nanos || 0) / 1e6;
-      return Number.isFinite(ms) ? new Date(ms).toISOString() : null;
-    }
-    return null;
-  };
-  const end = stamp((period && (period.end || period.End)) || l.billingPeriodEnd || l.billing_period_end || l.resetsAt);
-  const start = stamp((period && (period.start || period.Start)) || l.billingPeriodStart || l.billing_period_start);
-  const type = String((period && (period.type || period.periodType || period.period_type)) || '');
-  if (used == null && finite(l.remainingPercent) != null) used = 100 - finite(l.remainingPercent);
-  if (used == null) {
-    const limit = amount(l.monthlyLimit ?? l.monthly_limit);
-    const spent = amount(l.used);
-    if (limit > 0 && spent != null) used = (spent / limit) * 100;
-    else if (end || type === '1' || type === '2' || /WEEKLY|MONTHLY/i.test(type)) used = 0;
-  }
-  if (used == null) return null;
-  const startMs = start ? Date.parse(start) : NaN;
-  const endMs = end ? Date.parse(end) : NaN;
-  let windowSeconds = null;
-  if (Number.isFinite(startMs) && Number.isFinite(endMs) && endMs > startMs) windowSeconds = Math.round((endMs - startMs) / 1000);
-  else if (type === '2' || /WEEKLY/i.test(type)) windowSeconds = 7 * 24 * 3600;
-  else if (type === '1' || /MONTHLY/i.test(type)) windowSeconds = 30 * 24 * 3600;
-  const usedPct = pct(used);
-  return {
-    pct: usedPct,
-    remaining: Math.round((100 - usedPct) * 10) / 10,
-    total: null,
-    unit: null,
-    windowSeconds,
-    reset: Number.isFinite(endMs) ? new Date(endMs).toISOString() : null,
-  };
-}
-
-function parseGrok(res, now) {
-  const raw = res.limits || {};
-  const l = raw.config && typeof raw.config === 'object' ? raw.config : raw;
-  let remaining = l.remainingQueries;
-  let total = l.totalQueries;
-  let unit = 'queries';
-  if (!(total > 0) && l.totalTokens > 0) {
-    remaining = l.remainingTokens;
-    total = l.totalTokens;
-    unit = 'tokens';
-  }
-  // Query/token windows are the old rolling limit. Everything else is the usage pool.
-  if (!(total > 0)) {
-    const credits = creditsWindow(l);
-    return credits || { error: 'Unrecognised rate-limit response' };
-  }
-  const used = Math.max(0, total - Math.max(0, remaining));
-  const windowSeconds = Number(l.windowSizeSeconds) || null;
-  // When the pool is empty Grok reports how long until capacity frees up.
-  const wait = Number(l.waitTimeSeconds);
-  const reset = wait > 0 ? new Date(now + wait * 1000).toISOString() : null;
-  return { pct: pct((used / total) * 100), remaining, total, unit, windowSeconds, reset };
-}
-
 class Service {
-  constructor({ id, home, loginUrl, partition }) {
-    this.id = id;
-    this.home = home;
-    this.loginUrl = loginUrl;
-    this.partition = partition;
+  constructor({ id, name, home, loginUrl, partition, script, parse }) {
+    Object.assign(this, { id, name, home, loginUrl, partition, script, parse });
     this.worker = null;
     this.workerReady = null;
     this.loginWin = null;
@@ -233,7 +166,19 @@ class Service {
     }
   }
 
-  // Opens the site's real sign-in page; resolves once the session can read usage.
+  // One sync: { connected, windows, plan, detail, error, raw }.
+  async read(options = {}) {
+    const js = typeof this.script === 'function' ? this.script(options) : this.script;
+    const res = await this.run(js);
+    if (!res.auth) return { connected: false, raw: res };
+    if (res.error) return { connected: true, error: res.error, raw: res };
+    const parsed = this.parse(res, Date.now());
+    if (parsed.error) return { connected: true, error: parsed.error, raw: res };
+    return { connected: true, ...parsed, raw: res };
+  }
+
+  // Opens the real sign-in page in its own window and calls onDone once the
+  // session can read usage (or the user closes the window).
   openLogin(probe, onDone) {
     if (this.loginWin && !this.loginWin.isDestroyed()) {
       this.loginWin.focus();
@@ -242,7 +187,7 @@ class Service {
     const win = new BrowserWindow({
       ...this.windowOptions(true),
       center: true,
-      title: `Sign in to ${this.id === 'claude' ? 'Claude' : 'Grok'} · AI Usage`,
+      title: `Sign in to ${this.name} · AI Usage`,
     });
     this.loginWin = win;
     win.webContents.setWindowOpenHandler(() => ({
@@ -250,19 +195,24 @@ class Service {
       overrideBrowserWindowOptions: this.windowOptions(true),
     }));
     win.loadURL(this.loginUrl);
+    let finished = false;
+    const finish = () => {
+      if (finished) return;
+      finished = true;
+      clearInterval(poll);
+      onDone();
+    };
     const poll = setInterval(async () => {
       try {
         if (await probe()) {
-          clearInterval(poll);
           if (!win.isDestroyed()) win.close();
-          onDone();
+          finish();
         }
       } catch {}
     }, 3000);
     win.on('closed', () => {
-      clearInterval(poll);
       this.loginWin = null;
-      onDone();
+      finish();
     });
   }
 
@@ -272,34 +222,34 @@ class Service {
   }
 }
 
-const claude = new Service({
-  id: 'claude',
-  home: 'https://claude.ai/settings/usage',
-  loginUrl: 'https://claude.ai/login',
-  partition: 'persist:claude',
-});
-claude.browserUrl = 'https://claude.ai/settings/usage';
+const services = {
+  claude: new Service({
+    id: 'claude',
+    name: 'Claude',
+    home: 'https://claude.ai/settings/usage',
+    loginUrl: 'https://claude.ai/login',
+    partition: 'persist:claude',
+    script: CLAUDE_JS,
+    parse: parseClaude,
+  }),
+  openai: new Service({
+    id: 'openai',
+    name: 'ChatGPT',
+    home: 'https://chatgpt.com/',
+    loginUrl: 'https://chatgpt.com/auth/login',
+    partition: 'persist:openai',
+    script: OPENAI_JS,
+    parse: parseOpenAI,
+  }),
+  grok: new Service({
+    id: 'grok',
+    name: 'Grok',
+    home: 'https://grok.com/?_s=usage',
+    loginUrl: 'https://grok.com/sign-in',
+    partition: 'persist:grok',
+    script: ({ grokModel }) => grokJs(grokModel),
+    parse: parseGrok,
+  }),
+};
 
-const grok = new Service({
-  id: 'grok',
-  home: 'https://grok.com/?_s=usage',
-  loginUrl: 'https://grok.com/sign-in',
-  partition: 'persist:grok',
-});
-grok.browserUrl = 'https://grok.com/';
-
-async function syncClaude() {
-  const res = await claude.run(CLAUDE_JS);
-  if (!res.auth) return { connected: false, raw: res };
-  if (res.error) return { connected: true, error: res.error, raw: res };
-  return { connected: true, ...parseClaude(res), raw: res };
-}
-
-async function syncGrok(model) {
-  const res = await grok.run(grokJs(model));
-  if (!res.auth) return { connected: false, raw: res };
-  if (res.error) return { connected: true, error: res.error, raw: res };
-  return { connected: true, ...parseGrok(res, Date.now()), raw: res };
-}
-
-module.exports = { claude, grok, syncClaude, syncGrok, parseClaude, parseGrok };
+module.exports = { services };
