@@ -90,8 +90,10 @@ git tag v1.3.0
 git push origin v1.3.0
 ```
 
-The [Release workflow](.github/workflows/release.yml) checks both versions match the tag, builds and publishes
-the Windows installer, then builds the signed APK and attaches it to the same release. The APK needs the
+The [Release workflow](.github/workflows/release.yml) checks both versions match the tag and opens a draft
+release with that version's CHANGELOG.md notes. It builds the Windows installer and the signed APK in parallel,
+uploads both to the draft, and publishes it once every file is there. If a run fails, re-run it: it reuses the
+draft. The APK needs the
 signing secrets in [docs/android](docs/android/README.md#release-signing); without them the release is
 Windows-only.
 

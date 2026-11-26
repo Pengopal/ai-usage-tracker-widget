@@ -6,6 +6,11 @@ All notable changes to this project are listed here. The format follows
 
 ## [Unreleased]
 
+### Releases
+
+- The release workflow publishes through a draft: it creates the release, uploads every platform's files, then
+  publishes it. electron-builder 26 uploaded in parallel and created two releases for 1.3.1.
+
 ## [1.3.1] - 2026-11-23
 
 ### Android

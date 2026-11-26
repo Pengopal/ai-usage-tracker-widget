@@ -3,6 +3,11 @@ name: Release
 # the Windows installer (desktop/) and the Android APK (android/). The tag must
 # match desktop/package.json and android/gradle.properties. Installed apps
 # update from that release.
+#
+# The release starts as a private draft with the CHANGELOG.md notes. Each
+# platform uploads its files to that draft, and it is published (and marked
+# latest) only once every file is there, so the updaters never see a release
+# with missing files. Re-running a failed run reuses the same draft.
 on:
   push:
     tags: ['v*']
@@ -26,8 +31,33 @@ jobs:
           test "$desktop" = "$GITHUB_REF_NAME" || { echo "::error::Tag $GITHUB_REF_NAME does not match desktop/package.json $desktop"; exit 1; }
           test "$android" = "$GITHUB_REF_NAME" || { echo "::error::Tag $GITHUB_REF_NAME does not match android/gradle.properties $android"; exit 1; }
 
-  desktop:
+  draft:
     needs: versions
+    runs-on: ubuntu-latest
+    env:
+      GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+    steps:
+      - uses: actions/checkout@v7
+      - name: Create the draft release with notes from CHANGELOG.md
+        run: |
+          version="${GITHUB_REF_NAME#v}"
+          # Plain string matching (no regex), so the brackets need no escaping.
+          awk -v v="$version" '
+            index($0, "## [" v "]") == 1 { on = 1; next }
+            on && index($0, "## [") == 1 { exit }
+            on { print }
+          ' CHANGELOG.md > notes.md
+          test -s notes.md || { echo "::error::CHANGELOG.md has no section for $version"; exit 1; }
+          if draft=$(gh release view "$GITHUB_REF_NAME" --json isDraft --jq .isDraft 2>/dev/null); then
+            test "$draft" = "true" || { echo "::error::$GITHUB_REF_NAME is already published"; exit 1; }
+            echo "Reusing the existing draft"
+            gh release edit "$GITHUB_REF_NAME" --title "$GITHUB_REF_NAME" --notes-file notes.md
+          else
+            gh release create "$GITHUB_REF_NAME" --draft --verify-tag --title "$GITHUB_REF_NAME" --notes-file notes.md
+          fi
+
+  desktop:
+    needs: draft
     runs-on: windows-latest
     defaults:
       run:
@@ -54,9 +84,11 @@ jobs:
       - run: npm ci
       - run: npm test
 
-      - name: Build and publish
+      - name: Build
         run: |
-          args=(--win --publish always)
+          # electron-builder only builds; the files are uploaded below. Its own
+          # publishing uploads in parallel and can create duplicate releases.
+          args=(--win --publish never)
           if [ -n "$AZURE_CLIENT_ID" ] && [ -n "$SIGN_ENDPOINT" ]; then
             echo "Signing with Azure Artifact Signing"
             args+=(
@@ -71,22 +103,13 @@ jobs:
           npm run copy-core
           npx electron-builder "${args[@]}"
 
-      - name: Release notes from CHANGELOG.md
-        working-directory: .
+      - name: Upload to the draft
         run: |
           version="${GITHUB_REF_NAME#v}"
-          # Plain string matching (no regex), so the brackets need no escaping.
-          awk -v v="$version" '
-            index($0, "## [" v "]") == 1 { on = 1; next }
-            on && index($0, "## [") == 1 { exit }
-            on { print }
-          ' CHANGELOG.md > notes.md
-          test -s notes.md || { echo "::error::CHANGELOG.md has no section for $version"; exit 1; }
-          gh release edit "$GITHUB_REF_NAME" --title "$GITHUB_REF_NAME" --notes-file notes.md
+          gh release upload "$GITHUB_REF_NAME" --clobber             "dist/AI-Usage-Tracker-Setup-$version.exe"             "dist/AI-Usage-Tracker-Setup-$version.exe.blockmap"             "dist/AI-Usage-Tracker-Portable-$version.exe"             dist/latest.yml
 
   android:
-    # Runs after the desktop job so the release already exists to attach to.
-    needs: desktop
+    needs: draft
     runs-on: ubuntu-latest
     defaults:
       run:
@@ -124,7 +147,7 @@ jobs:
           echo "$KEYSTORE_BASE64" | base64 -d > "$ANDROID_KEYSTORE_PATH"
           ./gradlew --no-daemon testGithubDebugUnitTest assembleGithubRelease
           rm -f "$ANDROID_KEYSTORE_PATH"
-      - name: Attach the APK to the release
+      - name: Upload to the draft
         if: steps.key.outputs.ok == 'true'
         run: |
           version="${GITHUB_REF_NAME#v}"
@@ -132,3 +155,21 @@ jobs:
           test -f "$apk" || { echo "::error::Signed APK not found at $apk"; exit 1; }
           cp "$apk" "AI-Usage-Tracker-$version.apk"
           gh release upload "$GITHUB_REF_NAME" "AI-Usage-Tracker-$version.apk" --clobber
+
+  publish:
+    needs: [desktop, android]
+    runs-on: ubuntu-latest
+    env:
+      GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      HAS_ANDROID_KEY: ${{ secrets.ANDROID_KEYSTORE_BASE64 != '' }}
+    steps:
+      - name: Check every file is on the draft, then publish it
+        run: |
+          version="${GITHUB_REF_NAME#v}"
+          assets=$(gh release view "$GITHUB_REF_NAME" --repo "$GITHUB_REPOSITORY" --json assets --jq '.assets[].name')
+          want="AI-Usage-Tracker-Setup-$version.exe AI-Usage-Tracker-Setup-$version.exe.blockmap AI-Usage-Tracker-Portable-$version.exe latest.yml"
+          if [ "$HAS_ANDROID_KEY" = "true" ]; then want="$want AI-Usage-Tracker-$version.apk"; fi
+          for f in $want; do
+            grep -qxF "$f" <<<"$assets" || { echo "::error::$f is missing from the draft"; exit 1; }
+          done
+          gh release edit "$GITHUB_REF_NAME" --repo "$GITHUB_REPOSITORY" --draft=false --latest

@@ -45,9 +45,11 @@ android/  copies core/src → APK assets/core     (Gradle copyCore task, build o
 ## Releases and updates
 
 A `v*` tag runs [release.yml](../.github/workflows/release.yml): it checks the tag against
-`desktop/package.json` and `android/gradle.properties`, publishes the Windows installer and `latest.yml`, then
-attaches the signed APK. Both apps update from GitHub's *latest* release, which is why there is one release for
-every platform rather than one per platform.
+`desktop/package.json` and `android/gradle.properties` and opens a draft release with the CHANGELOG.md notes.
+The Windows build (installers, `.blockmap`, `latest.yml`) and the signed APK upload to that draft in parallel,
+and it is published and marked *latest* only once every file is there. Both apps update from GitHub's *latest*
+release, which is why there is one release for every platform rather than one per platform, and why it never
+goes public half-uploaded.
 
 ## Adding a platform
 
