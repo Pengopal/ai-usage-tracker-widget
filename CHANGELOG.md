@@ -6,6 +6,17 @@ All notable changes to this project are listed here. The format follows
 
 ## [Unreleased]
 
+## [1.4.0] - 2026-11-28
+
+### Desktop
+
+- ChatGPT sign-in opens the default browser, supports Google sign-in there, and returns to the widget to refresh Codex usage.
+- The Windows app has a custom opal usage-meter icon and Pengopal styling. Usage bars and rings use solid green, orange, and red.
+
+### Android
+
+- Tapping Refresh on the home-screen widget starts a priority sync, shows when it is queued, and updates the widget without opening the tracker.
+
 ### Releases
 
 - The release workflow publishes through a draft: it creates the release, uploads every platform's files, then

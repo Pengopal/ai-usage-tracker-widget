@@ -1,7 +1,7 @@
 {
   "name": "ai-usage-tracker-widget",
-  "productName": "AI Usage Tracker Widget",
-  "version": "1.3.1",
+  "productName": "Pengopal AI Usage Tracker",
+  "version": "1.4.0",
   "description": "Compact always-on-top Windows widget showing your live Claude, ChatGPT and Grok usage limits.",
   "main": "src/main.js",
   "author": "Muhammad Furqan",
@@ -27,10 +27,23 @@
   },
   "build": {
     "appId": "com.mufurqan.aiusagetracker",
-    "productName": "AI Usage Tracker Widget",
+    "productName": "Pengopal AI Usage Tracker",
     "files": [
       "src/**/*",
-      "package.json"
+      "package.json",
+      "!node_modules/@openai/**"
+    ],
+    "extraResources": [
+      {
+        "from": "node_modules/@openai/codex-win32-${arch}",
+        "to": "codex",
+        "filter": ["vendor/*/bin/codex.exe"]
+      },
+      {
+        "from": "build",
+        "to": "codex",
+        "filter": ["codex-*.txt"]
+      }
     ],
     "directories": {
       "output": "dist"
@@ -44,20 +57,27 @@
       }
     ],
     "win": {
+      "icon": "src/assets/app-icon.ico",
       "target": [
         "nsis",
         "portable"
       ]
     },
     "nsis": {
+      "installerIcon": "src/assets/app-icon.ico",
+      "uninstallerIcon": "src/assets/app-icon.ico",
       "artifactName": "AI-Usage-Tracker-Setup-${version}.${ext}",
       "oneClick": false,
       "allowToChangeInstallationDirectory": true,
       "createDesktopShortcut": true,
-      "shortcutName": "AI Usage Tracker"
+      "shortcutName": "Pengopal AI Usage Tracker"
     },
     "portable": {
       "artifactName": "AI-Usage-Tracker-Portable-${version}.${ext}"
     }
+  },
+  "optionalDependencies": {
+    "@openai/codex-win32-arm64": "npm:@openai/codex@0.172.0-win32-arm64",
+    "@openai/codex-win32-x64": "npm:@openai/codex@0.172.0-win32-x64"
   }
 }

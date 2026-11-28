@@ -8,6 +8,7 @@ contextBridge.exposeInMainWorld('api', {
   setView: (view) => ipcRenderer.send('set-view', view),
   syncNow: () => ipcRenderer.send('sync-now'),
   signIn: (id) => ipcRenderer.send('sign-in', id),
+  cancelChatGPTSignIn: () => ipcRenderer.send('cancel-chatgpt-sign-in'),
   signOut: (id) => ipcRenderer.invoke('sign-out', id),
   toggleAlwaysOnTop: () => ipcRenderer.invoke('toggle-always-on-top'),
   windowAction: (action) => ipcRenderer.send('window', action),

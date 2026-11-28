@@ -63,14 +63,17 @@ class UsageWidget : GlanceAppWidget() {
         val store = UsageStore.get(context)
         val catalog = Catalog.load(context)
         val timeFormat = DateFormat.getTimeFormat(context)
+        val widgetRefreshPending = Sync.widgetRefreshPending(context)
         provideContent {
             val snap by store.state.collectAsState()
             val syncing by Sync.running.collectAsState()
+            val refreshPending by widgetRefreshPending.collectAsState(initial = false)
             val now = System.currentTimeMillis()
             WidgetContent(
                 rows = buildRows(snap.services, snap.settings, catalog),
                 updated = snap.lastSync?.let { timeFormat.format(Date(it)) },
                 syncing = syncing,
+                refreshPending = refreshPending,
                 now = now,
             )
         }
@@ -93,7 +96,8 @@ class UsageWidgetReceiver : GlanceAppWidgetReceiver() {
 
 class RefreshAction : ActionCallback {
     override suspend fun onAction(context: Context, glanceId: GlanceId, parameters: ActionParameters) {
-        Sync.runNow(context)
+        Sync.refreshFromWidget(context)
+        UsageWidget().update(context, glanceId)
     }
 }
 
@@ -103,7 +107,7 @@ private fun style(c: androidx.compose.ui.graphics.Color, size: Float, weight: Fo
     TextStyle(color = color(c), fontSize = size.sp, fontWeight = weight)
 
 @Composable
-private fun WidgetContent(rows: List<UsageRow>, updated: String?, syncing: Boolean, now: Long) {
+private fun WidgetContent(rows: List<UsageRow>, updated: String?, syncing: Boolean, refreshPending: Boolean, now: Long) {
     val openApp = actionStartActivity<MainActivity>()
     Column(
         modifier = GlanceModifier.fillMaxSize().background(color(Palette.bg)).cornerRadius(16.dp)
@@ -113,12 +117,17 @@ private fun WidgetContent(rows: List<UsageRow>, updated: String?, syncing: Boole
             val anyConnected = rows.any { it.connected }
             Box(
                 modifier = GlanceModifier.size(6.dp).cornerRadius(3.dp)
-                    .background(color(if (syncing) Palette.accent else if (anyConnected) Palette.ok else Palette.faint)),
+                    .background(color(if (syncing || refreshPending) Palette.accent else if (anyConnected) Palette.ok else Palette.faint)),
             ) {}
             Spacer(GlanceModifier.width(6.dp))
             Text("Usage", style = style(Palette.text, 13f, FontWeight.Bold))
             Spacer(GlanceModifier.width(6.dp))
-            Text(if (syncing) "Syncing…" else updated ?: "", style = style(Palette.faint, 11f), maxLines = 1)
+            val status = when {
+                syncing -> "Syncing…"
+                refreshPending -> "Refresh queued…"
+                else -> updated.orEmpty()
+            }
+            Text(status, style = style(Palette.faint, 11f), maxLines = 1)
             Spacer(GlanceModifier.defaultWeight())
             Image(
                 provider = ImageProvider(R.drawable.ic_refresh),

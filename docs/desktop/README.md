@@ -1,4 +1,4 @@
-# AI Usage Tracker for Windows
+# Pengopal AI Usage Tracker for Windows
 
 ## The problem
 
@@ -38,7 +38,7 @@ keys) to set the order the widget lists them in.
 | Provider | Limits shown | Plans |
 | --- | --- | --- |
 | Claude | 5-hour, weekly | Free, Pro, Max 5x, Max 20x, Team, Enterprise |
-| ChatGPT | 5-hour, weekly | Free, Plus, Pro, Business, Enterprise |
+| ChatGPT (Codex limits) | 5-hour, weekly | Free, Plus, Pro, Business, Enterprise |
 | Grok | Weekly pool | Free, SuperGrok, SuperGrok Heavy, X Premium, X Premium+ |
 
 ### Stays out of the way
@@ -64,45 +64,45 @@ To start with Windows: `Win + R` → `shell:startup` → put a shortcut to the a
 
 ## Signing in
 
-**Sign in** opens the provider's real login page in a window. Sign in as usual; the window closes by itself
-once the app can read your usage, and the widget comes back to the front. You do this once per account.
+**ChatGPT** opens your default browser, where you can continue with Google or another method offered by OpenAI.
+After authorization, a local callback returns you to the widget and refreshes your Codex usage. The installer
+and portable app include the Codex runtime used for this connection.
 
-Your password goes only to Anthropic, OpenAI or xAI. The app keeps the sites' normal login cookies in its own
-private profile, like a browser does, and **Sign out** deletes them. If "Continue with Google" is blocked in the
-sign-in window, use email sign-in.
+**Claude and Grok** open a provider sign-in window. The window closes once the app can read your usage.
+The app uses a private browser profile for those sessions. Choose **Sign out** in Settings to disconnect a provider.
 
 <img src="images/signed-out.png" alt="Widget before signing in" width="320">
 
 ## How it reads your usage
 
-None of these services offers a public API for personal usage, so the widget reads the same endpoints their
-own websites use, from a hidden window signed in as you:
+ChatGPT uses the [Codex App Server](https://developers.openai.com/codex/app-server). Claude and Grok use
+their respective web sessions in hidden provider windows.
 
 | Provider | Endpoint | Gives |
 | --- | --- | --- |
 | Claude | `claude.ai/api/organizations/{org}/usage` (behind Settings → Usage) | 5-hour and weekly %, resets, plan tier |
-| ChatGPT | `chatgpt.com/backend-api/wham/usage` | 5-hour and weekly %, resets, plan |
+| ChatGPT | Codex `account/rateLimits/read` | Codex 5-hour and weekly %, resets, plan |
 | Grok | `grok.com/rest/grok/credits` (falls back to `/rest/rate-limits`) | Weekly pool %, reset |
 
-These are unofficial and can change without notice. When one does, the widget shows "Sync problem" until
-it's updated, and the last raw response is saved as `sync-debug-<provider>.json` in the data folder to make the
-fix quick.
+The website endpoints can change without notice. The widget shows sync errors and keeps the last successful readings.
+The web readers save their latest raw usage response as `sync-debug-<provider>.json` for debugging.
 
 **Gemini isn't supported.** Google blocks sign-in inside embedded app windows, and the Gemini app doesn't
 expose your usage anywhere the widget could read it.
 
 ## Data and privacy
 
-Everything stays on your PC, in `%APPDATA%\ai-usage-tracker-widget\`:
+Local settings and readings live in `%APPDATA%\AI Usage Tracker Widget\`:
 
 | File | Holds |
 | --- | --- |
 | `usage-data.json` | Last readings and settings |
 | `history.json` | Seven days of readings, for the pace heads-up |
 | `sync-debug-*.json` | The last raw usage response per provider |
-| `Partitions\` | The login sessions |
+| `Partitions\` | The web login sessions |
+| `chatgpt-codex\` | The isolated Codex App Server profile |
 
-The app talks only to the three providers and to GitHub (for updates). Delete the folder to reset everything.
+Codex keeps its credentials in Windows Credential Manager. Sign out in the widget to remove them.
 
 ## Develop
 
@@ -136,7 +136,8 @@ the readers, parsers and catalog in `core/`, never in the copy.
 | Path | What lives there |
 | --- | --- |
 | `desktop/src/main.js` | Window, tray, sync loop, alerts, IPC |
-| `desktop/src/sync.js` | Sign-in windows; runs the shared readers inside each provider's page |
+| `desktop/src/sync.js` | Embedded web sessions and shared readers |
+| `desktop/src/chatgpt.js` | ChatGPT browser sign-in and Codex usage reads |
 | `desktop/src/store.js` | Readings, settings and history on disk |
 | `desktop/src/updater.js` | Updates from GitHub Releases |
 | `desktop/src/renderer/` | The widget UI |

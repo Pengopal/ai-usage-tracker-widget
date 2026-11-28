@@ -1,9 +1,11 @@
 const {
-  app, BrowserWindow, ipcMain, Tray, Menu, nativeImage, shell, Notification, screen,
+  app, BrowserWindow, ipcMain, Tray, Menu, shell, Notification, screen,
 } = require('electron');
 const path = require('path');
+const { mkdirSync } = require('fs');
 const { Store, cleanThresholds } = require('./store');
 const { services } = require('./sync');
+const { ChatGPT, bundledCodex } = require('./chatgpt');
 const updater = require('./updater');
 const { computeInsights, sampleOf } = require('./core/insights');
 const { CATALOG, emptyService, planOptions, orderedIds, buildRows } = require('./core/providers');
@@ -14,6 +16,9 @@ const SYNC_MS = 60 * 1000;
 const PACE_ALERT_MS = 30 * 60 * 1000;
 const BACK_FROM_PCT = 90;
 const BACK_BELOW_PCT = 50;
+const APP_NAME = 'Pengopal AI Usage Tracker';
+const appIcon = path.join(__dirname, 'assets', 'app-icon.png');
+const trayIcon = path.join(__dirname, 'assets', 'app-icon.ico');
 
 let win = null;
 let tray = null;
@@ -21,31 +26,20 @@ let store = null;
 let quitting = false;
 let syncing = false;
 let mode = 'widget'; // or 'settings'
+let chatgpt;
+let chatgptLogin = null;
+let chatgptBusy = false;
+let chatgptError = null;
+let chatgptRevision = 0;
+
+// Reuse the existing profile after renaming the Windows product.
+const customProfile = app.commandLine.getSwitchValue('user-data-dir');
+const userData = customProfile ? path.resolve(customProfile) : path.join(app.getPath('appData'), 'AI Usage Tracker Widget');
+mkdirSync(userData, { recursive: true });
+app.setPath('userData', userData);
 
 if (!app.requestSingleInstanceLock()) {
   app.quit();
-}
-
-// Draws a small round gauge icon in memory so the app ships without image assets.
-function makeIcon(size) {
-  const buf = Buffer.alloc(size * size * 4);
-  const c = (size - 1) / 2;
-  const rOuter = size / 2;
-  const rInner = size * 0.28;
-  for (let y = 0; y < size; y++) {
-    for (let x = 0; x < size; x++) {
-      const d = Math.hypot(x - c, y - c);
-      const i = (y * size + x) * 4; // BGRA
-      if (d > rOuter) continue;
-      const angle = Math.atan2(y - c, x - c);
-      const ring = d > rInner;
-      // Blue ring with an orange arc in the upper-right quadrant.
-      const hot = ring && angle < -Math.PI * 0.15 && angle > -Math.PI * 0.75;
-      const [r, g, b] = !ring ? [15, 15, 19] : hot ? [255, 159, 67] : [77, 166, 255];
-      buf[i] = b; buf[i + 1] = g; buf[i + 2] = r; buf[i + 3] = 255;
-    }
-  }
-  return nativeImage.createFromBitmap(buf, { width: size, height: size });
 }
 
 const view = () => store.data.settings.view;
@@ -77,14 +71,14 @@ function createWindow() {
     minWidth: 220,
     minHeight: 60,
     frame: false,
-    backgroundColor: '#0e0e12',
+    backgroundColor: '#0e1a3a',
     resizable: true,
     maximizable: false,
     fullscreenable: false,
     alwaysOnTop: store.data.settings.alwaysOnTop,
     show: false,
-    icon: makeIcon(32),
-    title: 'AI Usage Tracker',
+    icon: appIcon,
+    title: APP_NAME,
     webPreferences: {
       preload: path.join(__dirname, 'preload.js'),
       contextIsolation: true,
@@ -176,8 +170,8 @@ function refreshTrayMenu() {
 }
 
 function createTray() {
-  tray = new Tray(makeIcon(16));
-  tray.setToolTip('AI Usage Tracker');
+  tray = new Tray(trayIcon);
+  tray.setToolTip(APP_NAME);
   tray.on('click', () => (win.isVisible() && win.isFocused() ? win.hide() : showWindow()));
   refreshTrayMenu();
 }
@@ -189,6 +183,7 @@ function snapshot() {
     settings,
     syncing,
     rows: buildRows(data, settings.providers, insights, settings.order),
+    chatgpt: { signingIn: !!chatgptLogin, busy: chatgptBusy, error: chatgptError },
     providers: order().map((id) => ({
       id,
       name: CATALOG[id].name,
@@ -228,17 +223,21 @@ function merge(id, result) {
   };
 }
 
-const readService = (id) => services[id].read({ grokModel: store.data.settings.grokModel });
+const readService = (id) => id === 'openai' ? chatgpt.read()
+  : services[id].read({ grokModel: store.data.settings.grokModel });
 
 async function syncAll() {
   if (syncing) return;
   syncing = true;
   pushData();
   try {
-    const ids = enabledIds();
+    const revision = chatgptRevision;
+    const ids = enabledIds().filter((id) => id !== 'openai' || (!chatgptLogin && !chatgptBusy));
     const results = await Promise.allSettled(ids.map(readService));
     const next = { ...store.data.services };
-    ids.forEach((id, i) => { next[id] = merge(id, results[i]); });
+    ids.forEach((id, i) => {
+      if (id !== 'openai' || revision === chatgptRevision) next[id] = merge(id, results[i]);
+    });
     store.set({ services: next });
     store.addSample(sampleOf(store.data.services));
   } finally {
@@ -249,7 +248,7 @@ async function syncAll() {
 }
 
 function notifyUser(title, body) {
-  new Notification({ title, body, icon: makeIcon(64) }).show();
+  new Notification({ title, body, icon: appIcon }).show();
 }
 
 const windowKey = (id, reset) => `${id}@${reset ? reset.slice(0, 13) : 'rolling'}`;
@@ -311,6 +310,35 @@ function installUpdate() {
   updater.install();
 }
 
+async function signInChatGPT() {
+  if (chatgptLogin || chatgptBusy) return;
+  const attempt = new AbortController();
+  chatgptLogin = attempt;
+  chatgptError = null;
+  pushData();
+  try {
+    if (!await chatgpt.signIn(attempt.signal)) return;
+    chatgptLogin = null;
+    chatgptBusy = true;
+    chatgptRevision++;
+    showWindow();
+    pushData();
+    const [result] = await Promise.allSettled([readService('openai')]);
+    store.setService('openai', merge('openai', result));
+    store.addSample(sampleOf(store.data.services));
+    checkAlerts();
+  } catch (error) {
+    if (!attempt.signal.aborted) {
+      chatgptError = error.message;
+      showWindow();
+    }
+  } finally {
+    chatgptLogin = null;
+    chatgptBusy = false;
+    pushData();
+  }
+}
+
 function registerIpc() {
   ipcMain.handle('get-data', () => snapshot());
 
@@ -343,9 +371,8 @@ function registerIpc() {
 
   ipcMain.on('sync-now', () => syncAll());
 
-  // Opens the real sign-in page in its own window. Once the session can read
-  // usage, that window closes and the widget comes back to the front, synced.
   ipcMain.on('sign-in', (_e, id) => {
+    if (id === 'openai') return signInChatGPT();
     const svc = services[id];
     if (!svc) return;
     svc.openLogin(async () => (await readService(id)).connected, async () => {
@@ -354,10 +381,31 @@ function registerIpc() {
     });
   });
 
+  ipcMain.on('cancel-chatgpt-sign-in', () => chatgptLogin?.abort());
+
   ipcMain.handle('sign-out', async (_e, id) => {
     const svc = services[id];
     if (!svc) return snapshot();
-    await svc.signOut();
+    if (id === 'openai') {
+      if (chatgptLogin || chatgptBusy) return snapshot();
+      chatgptBusy = true;
+      chatgptError = null;
+      chatgptRevision++;
+      pushData();
+      try {
+        await chatgpt.signOut();
+      } catch {
+        chatgptError = 'Could not sign out of ChatGPT. Try again.';
+      } finally {
+        chatgptBusy = false;
+      }
+      if (chatgptError) {
+        pushData();
+        return snapshot();
+      }
+    } else {
+      await svc.signOut();
+    }
     store.setService(id, emptyService());
     pushData();
     return snapshot();
@@ -411,6 +459,12 @@ app.on('second-instance', showWindow);
 app.whenReady().then(() => {
   app.setAppUserModelId('com.mufurqan.aiusagetracker');
   store = new Store(app.getPath('userData'));
+  chatgpt = new ChatGPT({
+    binary: bundledCodex(app.isPackaged),
+    home: path.join(app.getPath('userData'), 'chatgpt-codex'),
+    openBrowser: (url) => shell.openExternal(url),
+    legacy: services.openai,
+  });
   registerIpc();
   createWindow();
   createTray();
@@ -422,6 +476,10 @@ app.whenReady().then(() => {
   setInterval(syncAll, SYNC_MS);
 });
 
-app.on('before-quit', () => { quitting = true; });
+app.on('before-quit', () => {
+  quitting = true;
+  chatgptLogin?.abort();
+  chatgpt?.close();
+});
 // Hidden sync windows count as windows; quitting is driven by the tray / close button.
 app.on('window-all-closed', () => {});

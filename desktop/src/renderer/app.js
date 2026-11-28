@@ -11,6 +11,15 @@ const $ = (id) => document.getElementById(id);
 const $$ = (sel, root = document) => root.querySelectorAll(sel);
 const clone = (id) => $(id).content.firstElementChild.cloneNode(true);
 
+const chatgptState = (id) => id === 'openai' ? data.chatgpt : null;
+const chatgptStatus = (state) => state?.signingIn ? 'Continue in your browser…'
+  : state?.busy ? 'Updating ChatGPT…' : state?.error;
+
+function activateSignIn(id) {
+  if (chatgptState(id)?.signingIn) window.api.cancelChatGPTSignIn();
+  else window.api.signIn(id);
+}
+
 function level(pct) {
   if (pct >= 90) return 'danger';
   if (pct >= 70) return 'warn';
@@ -62,8 +71,13 @@ function renderBars(now) {
     el.querySelector('.provider-name').textContent = row.name;
     el.querySelector('.plan').textContent = row.plan || '';
     el.querySelector('.open').addEventListener('click', () => window.api.openUrl(row.id));
-    el.querySelector('.signin').addEventListener('click', () => window.api.signIn(row.id));
-    el.querySelector('.card-error').textContent = row.error ? `Sync problem: ${row.error}` : '';
+    const state = chatgptState(row.id);
+    const signIn = el.querySelector('.signin');
+    signIn.textContent = state?.signingIn ? 'Cancel' : 'Sign in';
+    signIn.disabled = !!state?.busy;
+    signIn.addEventListener('click', () => activateSignIn(row.id));
+    if (state?.signingIn || state?.busy) el.querySelector('.connection-status').textContent = chatgptStatus(state);
+    el.querySelector('.card-error').textContent = state?.error || (row.error ? `Sync problem: ${row.error}` : '');
 
     const metrics = el.querySelector('.metrics');
     for (const m of row.metrics) {
@@ -107,8 +121,20 @@ function ringFor(row, m, now) {
     el.classList.add('offline');
     arc.style.strokeDashoffset = RING_LEN;
     el.querySelector('.ring-pct').textContent = '—';
-    sub.textContent = row.connected ? 'No data' : 'Sign in';
-    if (!row.connected) el.addEventListener('click', () => window.api.signIn(row.id));
+    const state = chatgptState(row.id);
+    sub.textContent = state?.signingIn || state?.busy ? 'Connecting…' : row.connected ? 'No data' : 'Sign in';
+    if (!row.connected && !state?.signingIn && !state?.busy) {
+      const signIn = () => activateSignIn(row.id);
+      el.setAttribute('role', 'button');
+      el.setAttribute('aria-label', `Sign in to ${row.name}`);
+      el.tabIndex = 0;
+      el.addEventListener('click', signIn);
+      el.addEventListener('keydown', (event) => {
+        if (!['Enter', ' '].includes(event.key)) return;
+        event.preventDefault();
+        signIn();
+      });
+    }
     el.title = row.name;
     return el;
   }
@@ -128,6 +154,11 @@ function renderRings(now) {
     else rings.push(ringFor(row, null, now));
   }
   $('ring-list').replaceChildren(...rings);
+  const state = data.rows.some(({ id }) => id === 'openai') ? data.chatgpt : null;
+  const status = chatgptStatus(state);
+  $('ring-signin').classList.toggle('hidden', !status);
+  $('ring-signin-status').textContent = status || '';
+  $('ring-signin-cancel').classList.toggle('hidden', !state?.signingIn);
   return rings.length;
 }
 
@@ -325,7 +356,9 @@ function renderProviderSettings() {
       });
       el.querySelector('.account-btn').addEventListener('click', async () => {
         const cur = data.providers.find((x) => x.id === p.id);
-        if (cur.connected) {
+        if (chatgptState(p.id)?.signingIn) {
+          window.api.cancelChatGPTSignIn();
+        } else if (cur.connected) {
           data = await window.api.signOut(p.id);
           render();
         } else {
@@ -339,13 +372,15 @@ function renderProviderSettings() {
     const select = el.querySelector('.plan-select');
     if (document.activeElement !== select) select.value = p.plan;
     const status = el.querySelector('.account-status');
+    const state = chatgptState(p.id);
     status.textContent = !p.enabled ? 'Hidden'
-      : p.connected ? (p.lastSync ? `Connected · synced ${timeText(p.lastSync)}` : 'Connected')
-        : 'Not signed in';
-    status.classList.toggle('ok', p.enabled && p.connected);
+      : chatgptStatus(state) || (p.connected ? (p.lastSync ? `Connected · synced ${timeText(p.lastSync)}` : 'Connected') : 'Not signed in');
+    status.classList.toggle('ok', p.enabled && p.connected && !chatgptStatus(state));
+    status.classList.toggle('error', p.enabled && !!state?.error);
     const btn = el.querySelector('.account-btn');
-    btn.textContent = p.connected ? 'Sign out' : 'Sign in';
-    btn.classList.toggle('primary', !p.connected);
+    btn.textContent = state?.signingIn ? 'Cancel' : p.connected ? 'Sign out' : 'Sign in';
+    btn.disabled = !!state?.busy;
+    btn.classList.toggle('primary', !p.connected && !state?.signingIn);
   }
   // Match the saved order, unless a drag or save is mid-flight. Rows only move
   // when out of place, so a focused control isn't pulled out of the page.
@@ -410,7 +445,8 @@ function fit(ringCount) {
   fitFrame = requestAnimationFrame(() => {
     const view = mode === 'settings' ? $('settings') : data.settings.view === 'rings' ? $('rings') : $('bars');
     const inner = view.querySelector('.inner');
-    const chrome = document.querySelector('.titlebar').offsetHeight + 2; // + body border
+    const titlebar = document.querySelector('.titlebar');
+    const chrome = titlebar.offsetHeight + parseFloat(getComputedStyle(titlebar).marginBottom) + 2;
     const height = chrome + inner.offsetHeight;
     // Rings need room for the title-bar buttons even with one ring.
     const width = mode === 'widget' && data.settings.view === 'rings' ? Math.max(200, ringCount * RING_WIDTH + 26) : undefined;
@@ -426,6 +462,7 @@ function showSettings(open) {
 }
 
 function wire() {
+  $('ring-signin-cancel').addEventListener('click', () => window.api.cancelChatGPTSignIn());
   $('btn-settings').addEventListener('click', () => showSettings(true));
   $('settings').addEventListener('submit', (e) => { e.preventDefault(); showSettings(false); });
   $('btn-sync').addEventListener('click', () => window.api.syncNow());
