@@ -3,7 +3,8 @@
 <head>
   <meta charset="utf-8">
   <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self'">
-  <title>AI Usage Tracker</title>
+  <title>Pengopal AI Usage Tracker</title>
+  <link rel="icon" href="../assets/app-icon.png">
   <link rel="stylesheet" href="styles.css">
 </head>
 <body data-view="bars" data-mode="widget">
@@ -22,8 +23,9 @@
 
   <header class="titlebar">
     <div class="title">
-      <span class="status-dot" id="status-dot"></span>
+      <img class="brand-icon" src="../assets/app-icon.png" alt="">
       <span class="title-text" id="title-text">Usage</span>
+      <span class="status-dot" id="status-dot"></span>
       <span class="updated" id="updated"></span>
       <button class="pill hidden" id="btn-update" title="A new version is ready">Update</button>
     </div>
@@ -40,14 +42,20 @@
   <main id="bars" class="view"><div class="inner" id="bars-list"></div></main>
 
   <!-- Compact ring view -->
-  <main id="rings" class="view hidden"><div class="inner ring-row" id="ring-list"></div></main>
+  <main id="rings" class="view hidden"><div class="inner">
+    <div class="ring-row" id="ring-list"></div>
+    <div class="ring-signin hidden" id="ring-signin">
+      <span id="ring-signin-status" aria-live="polite"></span>
+      <button class="link" id="ring-signin-cancel">Cancel</button>
+    </div>
+  </div></main>
 
   <!-- Settings -->
   <form id="settings" class="view hidden" autocomplete="off">
     <div class="inner">
       <h3>Providers</h3>
       <div id="provider-settings"></div>
-      <p class="hint">Drag the handle to reorder. Sign in opens the real login. It closes by itself once you're in. If Google sign-in is blocked there, use email sign-in. "Auto" shows every limit your account reports; pick your plan to show only that plan's limits.</p>
+      <p class="hint">ChatGPT sign-in opens your default browser and returns here when complete. Drag providers to reorder them. Auto shows every usage limit your account reports.</p>
 
       <h3>Alerts</h3>
       <label class="switch-row"><span>Notifications</span><input type="checkbox" id="set-notify"><i></i></label>
@@ -63,7 +71,7 @@
 
       <h3>About</h3>
       <div class="about-row">
-        <span><span id="about-version"></span><small id="about-update"></small></span>
+        <span>Pengopal AI Usage Tracker<small id="about-version"></small><small id="about-update"></small></span>
         <button type="button" class="btn small" id="btn-update-action">Check for updates</button>
       </div>
     </div>
@@ -78,8 +86,8 @@
         <button class="ghost-icon open" title="Open in browser"><svg><use href="#i-out"/></svg></button>
       </div>
       <div class="metrics"></div>
-      <div class="disconnected"><span>Not connected</span><button class="link signin">Sign in</button></div>
-      <p class="card-error"></p>
+      <div class="disconnected"><span class="connection-status" aria-live="polite">Not connected</span><button class="link signin">Sign in</button></div>
+      <p class="card-error" aria-live="polite"></p>
     </section>
   </template>
 
@@ -112,7 +120,7 @@
         <svg class="logo"><use/></svg>
         <div class="account-text">
           <div class="account-name"></div>
-          <div class="account-status"></div>
+          <div class="account-status" aria-live="polite"></div>
         </div>
         <label class="switch-row bare" title="Show in widget"><input type="checkbox" class="show-toggle"><i></i></label>
       </div>

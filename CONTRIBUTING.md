@@ -47,9 +47,9 @@ Edit shared code in `core/` only: `desktop/src/core/` and the Android assets are
 
 ## Rules every change follows
 
-- **Sessions never leave the provider.** Usage is read inside the provider's own page. Never return tokens or
-  cookies to the main process, write them to disk, or log them; the `sync-debug-*.json` files must hold only
-  usage responses.
+- **Keep credentials out of the widget.** The web readers keep tokens and cookies in their provider sessions.
+  Windows ChatGPT delegates sign-in to Codex App Server, which stores its credentials in Windows Credential
+  Manager. The widget receives account status and rate limits. Keep credentials out of logs and debug files.
 - **Only interpreted usage crosses out of the page.** On Android the reader and `interpret()` run together in the
   WebView; Kotlin receives windows and a plan, never the raw response's cookies or tokens.
 - **The renderer stays sandboxed.** `contextIsolation`, `sandbox` and no `nodeIntegration`; the UI talks to the

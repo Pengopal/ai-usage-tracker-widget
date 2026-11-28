@@ -2,4 +2,6 @@
 <resources>
     <string name="app_name">AI Usage</string>
     <string name="widget_description">Your Claude, ChatGPT and Grok limits at a glance</string>
+    <string name="refresh_channel_name">Usage refresh</string>
+    <string name="refresh_notification_title">Refreshing AI usage</string>
 </resources>

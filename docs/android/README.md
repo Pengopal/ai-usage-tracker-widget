@@ -20,8 +20,8 @@ Needs Android 8.0 or newer. A Play Store version is planned; until then the APK 
 
 - **The widget** shows one line per limit: its name, "Resets in …" and the percentage, with a bar under it that
   turns orange at 70% and red at 90%. Tap it to open the app; tap ↻ to refresh.
-- **Refreshing:** every 15 minutes while you're online (Android's minimum for background work), whenever you
-  open the app, and when you tap ↻.
+- **Refreshing:** Android schedules a background refresh every 15 minutes while you're online. Tap ↻ on the
+  widget to request a priority refresh with the app closed. The widget shows when the request is queued or syncing.
 - **Providers:** show or hide each one, pick your plan (or leave it on Auto-detect), move them up or down, and
   sign out. The widget follows the same choices.
 - **Signing in** opens the provider's own login page inside the app. The page closes by itself once the app can

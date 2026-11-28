@@ -1,12 +1,12 @@
 <div align="center">
 
-<img src="docs/desktop/images/bars.png" alt="AI Usage Tracker widget showing Claude, ChatGPT and Grok limits" width="320">
+<img src="desktop/src/assets/app-icon.png" alt="Pengopal AI Usage Tracker logo" width="88">
 
 # AI Usage Tracker
 
 **Your Claude, ChatGPT and Grok limits, live on your desktop and your phone — with a heads-up before you run out.**
 
-[![Release](https://img.shields.io/github/v/release/Pengopal/ai-usage-tracker-widget?color=6aa8ff)](https://github.com/Pengopal/ai-usage-tracker-widget/releases/latest)
+[![Release](https://img.shields.io/github/v/release/Pengopal/ai-usage-tracker-widget?color=8fa8ff)](https://github.com/Pengopal/ai-usage-tracker-widget/releases/latest)
 [![CI](https://github.com/Pengopal/ai-usage-tracker-widget/actions/workflows/ci.yml/badge.svg)](https://github.com/Pengopal/ai-usage-tracker-widget/actions/workflows/ci.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-5fae84.svg)](LICENSE)
 
@@ -43,22 +43,26 @@ turns orange at 70% and red at 90%.
 | :---: | :---: |
 | <img src="docs/desktop/images/bars.png" alt="Windows widget" width="300"> | <img src="docs/android/images/widget.png" alt="Android home-screen widget" width="420"> |
 
+| Windows compact rings | Windows settings |
+| :---: | :---: |
+| <img src="docs/desktop/images/rings.png" alt="Windows widget in compact ring view" width="400"> | <img src="docs/desktop/images/settings.png" alt="Windows settings with provider sign-in and usage alerts" width="300"> |
+
 Each device signs in on its own; nothing is synced between them.
 
 ## How it reads your usage
 
-None of these services offers a public API for personal usage, so the app reads the same endpoints their own
-websites use, from inside the provider's own page, signed in as you. Your password and session never leave
-that page.
+The Windows app uses [Codex App Server](https://developers.openai.com/codex/app-server) for ChatGPT sign-in
+and Codex limits. The Android app reads ChatGPT usage in its own provider session. Both apps read Claude and
+Grok usage from the providers' websites.
 
 | Provider | Endpoint | Gives |
 | --- | --- | --- |
 | Claude | `claude.ai/api/organizations/{org}/usage` | 5-hour and weekly %, resets, plan tier |
-| ChatGPT | `chatgpt.com/backend-api/wham/usage` | 5-hour and weekly %, resets, plan |
+| ChatGPT | Codex `account/rateLimits/read` on Windows, `chatgpt.com/backend-api/wham/usage` on Android | 5-hour and weekly %, resets, plan |
 | Grok | `grok.com/rest/grok/credits` (falls back to `/rest/rate-limits`) | Weekly pool %, reset |
 
-These are unofficial and can change without notice; when one does, the app shows "Sync problem" until it's
-updated. **Gemini isn't supported**: Google blocks sign-in inside embedded windows.
+The website endpoints can change without notice. The app shows a sync error when a usage request fails.
+**Gemini isn't supported**: Google blocks sign-in inside embedded windows.
 
 ## Repository layout
 

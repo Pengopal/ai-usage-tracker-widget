@@ -1,7 +1,5 @@
-// Reads real usage from claude.ai, chatgpt.com and grok.com using a session the
-// user signs in to once inside the app. The shared core readers run inside a
-// hidden window on each site, so their requests carry the site's own cookies
-// exactly like the official usage pages do.
+// Claude, Grok and existing ChatGPT web sessions use shared readers in a hidden
+// window on the provider's site. New ChatGPT logins use the Codex app server.
 const { BrowserWindow, session } = require('electron');
 const readers = require('./core/readers');
 const { interpret } = require('./core/interpret');
@@ -78,6 +76,12 @@ class Service {
   async read(options = {}) {
     const res = await this.run(callReader(this.id, this.arg ? this.arg(options) : null));
     return { ...interpret(this.id, res, Date.now()), raw: res };
+  }
+
+  async readExistingLogin() {
+    const cookies = await session.fromPartition(this.partition).cookies.get({ url: this.home });
+    if (!cookies.some(({ name }) => /(?:^|[.-])session-token(?:\.\d+)?$/.test(name))) return { connected: false };
+    return this.read();
   }
 
   // Opens the real sign-in page in its own window and calls onDone once the

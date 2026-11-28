@@ -41,11 +41,11 @@ function openaiWindow(w, now) {
   const used = finite(w.used_percent ?? w.usedPercent);
   if (used == null) return null;
   let reset = null;
-  const at = finite(w.reset_at ?? w.resetAt);
+  const at = finite(w.reset_at ?? w.resetAt ?? w.resetsAt);
   const after = finite(w.reset_after_seconds ?? w.resetAfterSeconds);
   if (at) reset = new Date(at * (at < 1e12 ? 1000 : 1)).toISOString();
   else if (after != null) reset = new Date(now + after * 1000).toISOString();
-  const seconds = finite(w.limit_window_seconds ?? w.window_minutes * 60);
+  const seconds = finite(w.limit_window_seconds ?? (w.windowDurationMins ?? w.window_minutes) * 60);
   return { pct: pct(used), reset, seconds };
 }
 
